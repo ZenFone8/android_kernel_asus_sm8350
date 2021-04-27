@@ -10,13 +10,10 @@
 		compatible = "qcom,blkdev-rename";
 		actual-dev = "vda", "vdb", "vdc",
 				"vdd", "vde", "vdf",
-				"vdg", "vdh", "vdj";
+				"vdg", "vdh";
 		rename-dev = "system", "userdata", "vendor",
 				"persist", "modem", "bluetooth",
 				"misc", "vbmeta";
-		rename-dev-ab = "super", "userdata", "vbmeta_system_a",
-				"persist", "modem_a", "bluetooth_a",
-				"misc", "vbmeta_a", "metadata";
 	};
 
 };
@@ -34,13 +31,5 @@
 };
 
 &pcie0 {
-	status = "ok";
-};
-
-&sdhc_2 {
-	status = "ok";
-};
-
-&qupv3_se7_4uart {
 	status = "ok";
 };

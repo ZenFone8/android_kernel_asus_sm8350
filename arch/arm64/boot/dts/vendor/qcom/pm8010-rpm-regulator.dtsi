@@ -1,7 +1,7 @@
 &rpm_bus {
-	rpm-regulator-ldom1 {
+	rpm-regulator-ldoc1 {
 		compatible = "qcom,rpm-smd-regulator-resource";
-		qcom,resource-name = "ldom";
+		qcom,resource-name = "ldoc";
 		qcom,resource-id = <1>;
 		qcom,regulator-type = <0>;
 		qcom,regulator-hw-type = "pmic5-ldo";
@@ -16,9 +16,9 @@
 		};
 	};
 
-	rpm-regulator-ldom2 {
+	rpm-regulator-ldoc2 {
 		compatible = "qcom,rpm-smd-regulator-resource";
-		qcom,resource-name = "ldom";
+		qcom,resource-name = "ldoc";
 		qcom,resource-id = <2>;
 		qcom,regulator-type = <0>;
 		qcom,regulator-hw-type = "pmic5-ldo";
@@ -33,9 +33,9 @@
 		};
 	};
 
-	rpm-regulator-ldom3 {
+	rpm-regulator-ldoc3 {
 		compatible = "qcom,rpm-smd-regulator-resource";
-		qcom,resource-name = "ldom";
+		qcom,resource-name = "ldoc";
 		qcom,resource-id = <3>;
 		qcom,regulator-type = <0>;
 		qcom,regulator-hw-type = "pmic5-ldo";
@@ -50,9 +50,9 @@
 		};
 	};
 
-	rpm-regulator-ldom4 {
+	rpm-regulator-ldoc4 {
 		compatible = "qcom,rpm-smd-regulator-resource";
-		qcom,resource-name = "ldom";
+		qcom,resource-name = "ldoc";
 		qcom,resource-id = <4>;
 		qcom,regulator-type = <0>;
 		qcom,regulator-hw-type = "pmic5-ldo";
@@ -67,9 +67,9 @@
 		};
 	};
 
-	rpm-regulator-ldom5 {
+	rpm-regulator-ldoc5 {
 		compatible = "qcom,rpm-smd-regulator-resource";
-		qcom,resource-name = "ldom";
+		qcom,resource-name = "ldoc";
 		qcom,resource-id = <5>;
 		qcom,regulator-type = <0>;
 		qcom,regulator-hw-type = "pmic5-ldo";
@@ -84,9 +84,9 @@
 		};
 	};
 
-	rpm-regulator-ldom6 {
+	rpm-regulator-ldoc6 {
 		compatible = "qcom,rpm-smd-regulator-resource";
-		qcom,resource-name = "ldom";
+		qcom,resource-name = "ldoc";
 		qcom,resource-id = <6>;
 		qcom,regulator-type = <0>;
 		qcom,regulator-hw-type = "pmic5-ldo";
@@ -101,9 +101,9 @@
 		};
 	};
 
-	rpm-regulator-ldom7 {
+	rpm-regulator-ldoc7 {
 		compatible = "qcom,rpm-smd-regulator-resource";
-		qcom,resource-name = "ldom";
+		qcom,resource-name = "ldoc";
 		qcom,resource-id = <7>;
 		qcom,regulator-type = <0>;
 		qcom,regulator-hw-type = "pmic5-ldo";

@@ -1,5 +1,4 @@
 #include "direwolf.dtsi"
-#include "direwolf-pmic.dtsi"
 
 / {
 	model = "Qualcomm Technologies, Inc. DirewolfAU ADAS SoC";

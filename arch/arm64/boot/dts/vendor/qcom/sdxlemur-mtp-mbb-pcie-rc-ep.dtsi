@@ -1,4 +1,5 @@
 #include "sdxlemur-mtp.dtsi"
+#include "sdxlemur-mtp-audio-overlay.dtsi"
 
 &soc {
 	ioss_aqc_eth0_rx: aqc_rx@eth0 {
@@ -38,7 +39,7 @@
 		qcom,dir-rx;
 		qcom,rx-filter-ip;
 
-		qcom,ring-size = <1023>; /* Cannot be a power of 2 */
+		qcom,ring-size = <1024>;
 		qcom,buff-size = <2048>;
 
 		qcom,mod-count-min = <32>;
@@ -142,8 +143,4 @@
 			qcom,iommu-dma = "atomic";
 		};
 	};
-};
-
-&pcie0 {
-	qcom,target-link-speed = <3>;
 };
