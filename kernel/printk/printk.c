@@ -419,6 +419,59 @@ DEFINE_RAW_SPINLOCK(logbuf_lock);
 		printk_safe_exit_irqrestore(flags);	\
 	} while (0)
 
+#ifdef CONFIG_MACH_ASUS
+static char *asus_log_buf = NULL;
+static bool is_logging_to_asus_buffer = false;
+int boot_after_60sec = 0;
+void *memset_nc(void *s, int c, size_t count);
+
+
+/* this memcpy_nc() is for non cached memory */
+
+static void *memcpy_nc(void *dest, const void *src, size_t n)
+{
+	int i = 0;
+	u8 *d = (u8 *)dest, *s = (u8 *)src;
+	for (i = 0; i < n; i++)
+		d[i] = s[i];
+
+	return dest;
+}
+static int write_to_asus_log_buffer(const char *text, size_t text_len,
+				enum log_flags lflags) {
+	static ulong log_write_index = 0; /* the index to write the log in asus log buffer */
+	ulong *printk_buffer_slot2_addr = (ulong *)PRINTK_BUFFER_SLOT2;
+
+	if (!asus_log_buf) {
+		return -1;
+	}
+
+	if (log_write_index >= PRINTK_BUFFER_SLOT_SIZE) {
+		return -2;
+	}
+
+	if (log_write_index + text_len >= PRINTK_BUFFER_SLOT_SIZE) {
+		ulong part1 = PRINTK_BUFFER_SLOT_SIZE - log_write_index;
+		ulong part2 = text_len -part1;
+		memcpy_nc(asus_log_buf+log_write_index, text, part1);
+		memcpy_nc(asus_log_buf, text + part1, part2);
+		log_write_index = part2;
+	} else {
+		memcpy_nc(asus_log_buf+log_write_index, text, text_len);
+		log_write_index += text_len;
+	}
+
+	if (lflags & LOG_NEWLINE) {
+		asus_log_buf[log_write_index++] = '\n';
+		log_write_index = log_write_index % PRINTK_BUFFER_SLOT_SIZE;
+	}
+
+	*(printk_buffer_slot2_addr + 1) = log_write_index; /* Remeber log buffer index */
+
+	return text_len;
+}
+#endif
+
 #ifdef CONFIG_PRINTK
 DECLARE_WAIT_QUEUE_HEAD(log_wait);
 /* the next printk record to read by syslog(READ) or /proc/kmsg */
@@ -3442,4 +3495,32 @@ void kmsg_dump_rewind(struct kmsg_dumper *dumper)
 }
 EXPORT_SYMBOL_GPL(kmsg_dump_rewind);
 
+#endif
+
+#ifdef CONFIG_MACH_ASUS
+void printk_buffer_rebase(void)
+{
+/*
+ * This will NOT do real printk buffer rebase.
+ * We just set a flag to let vprintk_emit() also write
+ * kernel log to our remapped buffer.
+ * Then we can save the content of our remapped buffer while rebooting
+ * after the device crash.
+ */
+
+	asus_log_buf = (char *) PRINTK_BUFFER_VA;
+	if (!asus_log_buf) {
+		printk("%s: asus_log_buf is NULL\n", __func__);
+		return;
+		
+	}
+
+	
+	memset_nc(asus_log_buf, 0, PRINTK_BUFFER_SLOT_SIZE);
+	//memset_nc(asus_log_buf, 0, PRINTK_BUFFER_SLOT_SIZE);
+
+	is_logging_to_asus_buffer = true;
+
+}
+EXPORT_SYMBOL(printk_buffer_rebase);
 #endif
