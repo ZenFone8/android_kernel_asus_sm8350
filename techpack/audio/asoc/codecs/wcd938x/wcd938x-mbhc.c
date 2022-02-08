@@ -2,7 +2,6 @@
 /*
  * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
  */
-#define DEBUG
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
@@ -950,15 +949,7 @@ int wcd938x_mbhc_hs_detect(struct snd_soc_component *component,
 		return -EINVAL;
 	}
 
-/* ASUS BSP audio: For Picasso project HW design +++ */
-#if defined ASUS_PICASSO_PROJECT
-	dev_err(component->dev, "%s: Is Picasso project dont initialized mbhc!\n", __func__);
-	return 0;
-#else
 	return wcd_mbhc_start(&wcd938x_mbhc->wcd_mbhc, mbhc_cfg);
-#endif
-/* ASUS BSP audio --- */
-
 }
 EXPORT_SYMBOL(wcd938x_mbhc_hs_detect);
 
