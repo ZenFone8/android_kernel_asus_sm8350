@@ -424,7 +424,7 @@ static int drm_notifier_callback(struct notifier_block *self,
     return 0;
 }
 
-void RegisterDRMCallback(void)
+void RegisterDRMCallback()
 {
     int ret = 0;
 
