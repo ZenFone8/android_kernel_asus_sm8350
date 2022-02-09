@@ -1,8 +1,0 @@
-menu "TouchSense driver support"
-
-config TSPDRV
-	tristate "TouchSense driver support"
-	depends on MACH_ASUS_ZS673KS || MACH_ASUS_PICASSO
-	default m
-
-endmenu
