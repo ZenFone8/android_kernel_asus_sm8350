@@ -1,13 +1,3 @@
-obj-n	+=ASH_ATTR/ 
-obj-n	+=ASH_Report/
-obj-n	+=ASH_Factory/
-obj-n	+=ASH_GPIO/
-obj-n	+=ASH_Hardware/
-obj-n	+=ASH_Algo/
-
-obj-n 	+=ASH_testDriver/
-
-
 ccflags-y += -DDEFAULT_SYMBOL_NAMESPACE=ANDROID_GKI_VFS_EXPORT_ONLY
 ccflags-y += -DANDROID_GKI_VFS_EXPORT_ONLY=VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver
 
