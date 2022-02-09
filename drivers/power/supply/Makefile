@@ -96,8 +96,6 @@ ifeq ($(CONFIG_MACH_ASUS_SAKE),y)
 obj-$(CONFIG_QTI_BATTERY_CHARGER)	+= qti_battery_charger_main.o qti_battery_charge_notify.o asus_battery_charger_ZF8.o
 else ifeq ($(CONFIG_MACH_ASUS_VODKA),y)
 obj-$(CONFIG_QTI_BATTERY_CHARGER)	+= qti_battery_charger_main.o qti_battery_charge_notify.o asus_battery_charger_ZF8.o
-else ifeq ($(CONFIG_MACH_ASUS_ZS673KS),y)
-obj-$(CONFIG_QTI_BATTERY_CHARGER)	+= qti_battery_charger_main.o asus_battery_charger.o fg27z561.o qti_battery_charge_notify.o
 else
 obj-$(CONFIG_QTI_BATTERY_CHARGER)       += qti_battery_charger_main.o
 endif
