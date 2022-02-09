@@ -199,9 +199,6 @@ obj-$(CONFIG_TSPDRV) += motor/tspdrv/
 # ASUS_BSP Clay : ALSPSsensor and Airtrigger driver
 obj-$(CONFIG_SENSORS_SSC)       += sensors/
 
-#ASUS_BSP ec hid driver
-obj-y				+= ec_hid_driver/
-
 #Tuxera
 ifeq ($(ASUS_BUILD_PROJECT),ZS673KS)
 	ifdef CONFIG_TUXERA_USERDEBUG
