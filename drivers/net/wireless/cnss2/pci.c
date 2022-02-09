@@ -76,8 +76,8 @@ static DEFINE_SPINLOCK(time_sync_lock);
 #define FORCE_WAKE_DELAY_MAX_US			6000
 #define FORCE_WAKE_DELAY_TIMEOUT_US		60000
 
-#define POWER_ON_RETRY_MAX_TIMES		3
-#define POWER_ON_RETRY_DELAY_MS			200
+#define POWER_ON_RETRY_MAX_TIMES		10
+#define POWER_ON_RETRY_DELAY_MS			600
 
 #define LINK_TRAINING_RETRY_MAX_TIMES		3
 #define LINK_TRAINING_RETRY_DELAY_MS		500
@@ -2528,7 +2528,7 @@ retry:
 			cnss_pr_dbg("Value of SW_CTRL GPIO: %d\n",
 				    cnss_gpio_get_value(plat_priv,
 							sw_ctrl_gpio));
-			msleep(POWER_ON_RETRY_DELAY_MS * retry);
+			msleep(POWER_ON_RETRY_DELAY_MS);
 			goto retry;
 		}
 		/* Assert when it reaches maximum retries */
