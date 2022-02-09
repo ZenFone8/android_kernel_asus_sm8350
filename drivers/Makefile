@@ -202,9 +202,6 @@ obj-$(CONFIG_SENSORS_SSC)       += sensors/
 #ASUS_BSP ec hid driver
 obj-y				+= ec_hid_driver/
 
-#ASUS_BSP gamepad hid driver
-obj-y				+= gamepad_hid_driver/
-
 #Tuxera
 ifeq ($(ASUS_BUILD_PROJECT),ZS673KS)
 	ifdef CONFIG_TUXERA_USERDEBUG
