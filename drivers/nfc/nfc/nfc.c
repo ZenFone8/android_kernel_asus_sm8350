@@ -48,7 +48,6 @@
 #include <linux/i2c.h>
 
 #include "nfc.h"
-#include "sn1xx.h"
 #include "pn8xt.h"
 
 #define MAX_BUFFER_SIZE         (512)

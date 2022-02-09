@@ -36,7 +36,6 @@
 #include "../nfc/nfc.h"
 
 #include "ese.h"
-#include "sn1xx.h"
 #include "pn8xt.h"
 
 /*Compile time function calls based on the platform selection*/
