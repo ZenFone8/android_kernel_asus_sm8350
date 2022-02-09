@@ -192,10 +192,6 @@ obj-$(CONFIG_GNSS)		+= gnss/
 obj-$(CONFIG_INTERCONNECT)	+= interconnect/
 obj-$(CONFIG_COUNTER)		+= counter/
 
-#ASUS_BSP Vibrator +++
-obj-$(CONFIG_TSPDRV) += motor/tspdrv/
-#ASUS_BSP Vibrator ---
-
 # ASUS_BSP Clay : ALSPSsensor and Airtrigger driver
 obj-$(CONFIG_SENSORS_SSC)       += sensors/
 

@@ -230,10 +230,6 @@ source "drivers/interconnect/Kconfig"
 
 source "drivers/counter/Kconfig"
 
-# ASUS_BSP_Vibrator +++
-source "drivers/motor/tspdrv/Kconfig"
-# ASUS_BSP_Vibrator ---
-
 source "drivers/tuxera/Kconfig"
 
 source "drivers/tuxera/zs673ks/exfat/user/Kconfig"
