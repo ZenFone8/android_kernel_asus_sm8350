@@ -234,9 +234,6 @@ source "drivers/counter/Kconfig"
 source "drivers/motor/tspdrv/Kconfig"
 # ASUS_BSP_Vibrator ---
 
-# ASUS_BSP Deeo: AuraLight
-source "drivers/aura_sync/Kconfig"
-
 source "drivers/tuxera/Kconfig"
 
 source "drivers/tuxera/zs673ks/exfat/user/Kconfig"

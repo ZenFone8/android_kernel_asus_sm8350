@@ -196,9 +196,6 @@ obj-$(CONFIG_COUNTER)		+= counter/
 obj-$(CONFIG_TSPDRV) += motor/tspdrv/
 #ASUS_BSP Vibrator ---
 
-# ASUS_BSP Deeo : AURA SYNC driver
-obj-y				+= aura_sync/
-
 # ASUS_BSP Clay : ALSPSsensor and Airtrigger driver
 obj-$(CONFIG_SENSORS_SSC)       += sensors/
 
