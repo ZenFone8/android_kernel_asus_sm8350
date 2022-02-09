@@ -552,6 +552,5 @@ source "drivers/misc/cardreader/Kconfig"
 source "drivers/misc/habanalabs/Kconfig"
 source "drivers/misc/aw8697_haptic/Kconfig"
 source "drivers/misc/latch_ak09973/Kconfig"
-source "drivers/misc/latch_sensor/Kconfig"
 source "drivers/misc/hall_sensor/Kconfig"
 endmenu
