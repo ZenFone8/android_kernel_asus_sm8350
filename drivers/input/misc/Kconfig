@@ -925,17 +925,6 @@ config INPUT_SX932X_SAKE
 	  To compile this driver as a module, choose M here: the
 	  module will be called INPUT_SX932X_SAKE.
 
-config INPUT_SX932X_VODKA
-	tristate "INPUT_SX932X_VODKA cap sensor input device"
-	depends on MACH_ASUS_VODKA
-	default m
-	help
-	  Say Y here if you want to support a cap sensor connected via I2C
-	  with a INPUT_SX932X_VODKA.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called INPUT_SX932X_VODKA.
-
 config ASUS
        default n
        help
