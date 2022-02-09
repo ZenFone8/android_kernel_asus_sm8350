@@ -1316,8 +1316,6 @@ source "drivers/input/touchscreen/synaptics_tcm/Kconfig"
 source "drivers/input/touchscreen/focaltech_touch/Kconfig"
 source "drivers/input/touchscreen/Sake_TP_3658U/Kconfig"
 source "drivers/input/touchscreen/Vodka_TP_3518U/Kconfig"
-source "drivers/input/touchscreen/ROG5_TP/Kconfig"
-source "drivers/input/touchscreen/ROG5_TP2/Kconfig"
 
 config TOUCHSCREEN_SYNAPTICS_DSX
 	bool "Synaptics DSX Touchscreen Driver"
