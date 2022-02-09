@@ -230,22 +230,4 @@ source "drivers/interconnect/Kconfig"
 
 source "drivers/counter/Kconfig"
 
-source "drivers/tuxera/Kconfig"
-
-source "drivers/tuxera/zs673ks/exfat/user/Kconfig"
-
-source "drivers/tuxera/zs673ks/exfat/userdebug/Kconfig"
-
-source "drivers/tuxera/zs673ks/ntfs/user/Kconfig"
-
-source "drivers/tuxera/zs673ks/ntfs/userdebug/Kconfig"
-
-source "drivers/tuxera/zs675kw/exfat/user/Kconfig"
-
-source "drivers/tuxera/zs675kw/exfat/userdebug/Kconfig"
-
-source "drivers/tuxera/zs675kw/ntfs/user/Kconfig"
-
-source "drivers/tuxera/zs675kw/ntfs/userdebug/Kconfig"
-
 endmenu

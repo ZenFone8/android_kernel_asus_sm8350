@@ -194,26 +194,3 @@ obj-$(CONFIG_COUNTER)		+= counter/
 
 # ASUS_BSP Clay : ALSPSsensor and Airtrigger driver
 obj-$(CONFIG_SENSORS_SSC)       += sensors/
-
-#Tuxera
-ifeq ($(ASUS_BUILD_PROJECT),ZS673KS)
-	ifdef CONFIG_TUXERA_USERDEBUG
-		obj-y				+= tuxera/zs673ks/exfat/userdebug/
-		obj-y				+= tuxera/zs673ks/ntfs/userdebug/
-	else
-		obj-y				+= tuxera/zs673ks/exfat/user/
-		obj-y				+= tuxera/zs673ks/ntfs/user/
-	endif
-endif
-
-#Tuxera
-ifeq ($(ASUS_BUILD_PROJECT),PICASSO)
-	ifdef CONFIG_TUXERA_USERDEBUG
-		obj-y				+= tuxera/zs675kw/exfat/userdebug/
-		obj-y				+= tuxera/zs675kw/ntfs/userdebug/
-	else
-		obj-y				+= tuxera/zs675kw/exfat/user/
-		obj-y				+= tuxera/zs675kw/ntfs/user/
-	endif
-endif
-
