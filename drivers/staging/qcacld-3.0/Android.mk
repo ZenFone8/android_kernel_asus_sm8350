@@ -177,12 +177,15 @@ TARGET_FW_PATH := $(TARGET_OUT_ETC)/$(TARGET_FW_DIR)
 endif
 
 $(shell mkdir -p $(TARGET_FW_PATH); \
-	ln -sf $(TARGET_MAC_BIN_PATH)/wlan_mac.bin $(TARGET_FW_PATH)/wlan_mac.bin)
+	ln -sf /vendor/factory/wlan_mac.bin $(TARGET_FW_PATH)/wlan_mac.bin)
+$(shell ln -sf /vendor/factory/COUNTRY $(TARGET_FW_PATH)/COUNTRY)
 ifneq ($(GENERIC_ODM_IMAGE),true)
-$(shell ln -sf $(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
+#$(shell ln -sf $(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
 endif
 endif # Multi-ko check
 endif # DLKM check
 endif # supported target check
+include $(call all-makefiles-under,$(LOCAL_PATH))
+
 endif # WLAN enabled check
 endif # ENABLE_QCACLD
