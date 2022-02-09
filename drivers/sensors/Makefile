@@ -3,7 +3,6 @@
 #obj-$(CONFIG_SENSORS_SSC)	+= sensors_ssc.o
 obj-m                           += icm206xx.o
 obj-y                           += ASH/
-obj-$(CONFIG_MACH_ASUS_ZS673KS)	+= snt8100fsr-linux/
 
 ifeq ($(CONFIG_MACH_ASUS_SAKE),y)
 KBUILD_CFLAGS += -DCONFIG_TMD2755_FLAG=1
