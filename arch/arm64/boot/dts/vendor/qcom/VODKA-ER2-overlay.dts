@@ -43,10 +43,6 @@
 
 //ASUS BSP Latch sensor +++
 &qupv3_se15_i2c {
-	latch_sensor@0d {
-	    status = "disabled";
-	};
-
 	latch_ak09973@10 {
 		compatible = "qcom,latch-ak09973";
 		reg=<0x10>;

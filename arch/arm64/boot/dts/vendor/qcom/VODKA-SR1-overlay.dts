@@ -59,16 +59,6 @@
 &qupv3_se15_i2c {
 	status = "ok";
 	qcom,clk-freq-out = <400000>;
-	latch_sensor@0d {
-		compatible = "qcom,latch";
-		reg=<0x0d>;
-		pinctrl-names = "latch_gpio_high","latch_gpio_low";
-		pinctrl-0 = <&gpio_latch_active>;
-		pinctrl-1 = <&gpio_latch_suspend>;
-		latch,int-gpio = <&tlmm 79 0x0>;
-		latch,reset_gpio= <&tlmm 78 0x0>;
-		vdd-supply = <&L8C>;
-	};
 };
 //ASUS BSP Latch sensor ---
 
