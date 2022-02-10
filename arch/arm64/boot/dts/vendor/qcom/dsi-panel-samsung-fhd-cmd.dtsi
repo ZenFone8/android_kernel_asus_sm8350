@@ -41,6 +41,29 @@
 		qcom,dynamic-mode-switch-enabled;
 		qcom,dynamic-mode-switch-type = "dynamic-resolution-switch-immediate";
 
+		qcom,fod-dim-lut = <
+			/* brightness, alpha */
+			0	0xFF
+			2	0xEB
+			4	0xEA
+			6	0xE9
+			10	0xE5
+			15	0xE0
+			34	0xD0
+			66	0xC0
+			109	0xB0
+			164	0xA0
+			243	0x90
+			321	0x80
+			416	0x70
+			521	0x60
+			633	0x50
+			750	0x40
+			885	0x30
+			1000	0x24
+			1023	0x21
+		>;
+
 		qcom,mdss-dsi-display-timings {
 			timing@0{
 				qcom,mdss-dsi-panel-framerate = <60>;
