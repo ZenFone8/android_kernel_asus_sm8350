@@ -410,4 +410,9 @@ int dsi_panel_create_cmd_packets(const char *data, u32 length, u32 count,
 void dsi_panel_destroy_cmd_packets(struct dsi_panel_cmd_set *set);
 
 void dsi_panel_dealloc_cmd_packets(struct dsi_panel_cmd_set *set);
+
+int dsi_panel_set_fod_hbm(struct dsi_panel *panel, bool status);
+
+u32 dsi_panel_get_fod_dim_alpha(struct dsi_panel *panel);
+
 #endif /* _DSI_PANEL_H_ */
