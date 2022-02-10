@@ -3556,13 +3556,32 @@ static void dsi_panel_setup_vm_ops(struct dsi_panel *panel, bool trusted_vm_env)
 	}
 }
 
+static ssize_t sysfs_fod_ui_read(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct dsi_display *display = dev_get_drvdata(dev);
+	struct dsi_panel *panel = display->panel;
+	bool status = atomic_read(&panel->fod_ui);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", status);
+}
+
+static DEVICE_ATTR(fod_ui, 0444, sysfs_fod_ui_read, NULL);
+
 static struct attribute *panel_attrs[] = {
+	&dev_attr_fod_ui.attr,
 	NULL,
 };
 
 static struct attribute_group panel_attrs_group = {
 	.attrs = panel_attrs,
 };
+
+void dsi_panel_set_fod_ui(struct dsi_panel *panel, bool status)
+{
+	atomic_set(&panel->fod_ui, status);
+	sysfs_notify(&panel->parent->kobj, NULL, "fod_ui");
+}
 
 static int dsi_panel_sysfs_init(struct dsi_panel *panel)
 {
