@@ -233,7 +233,8 @@
 				drive-strength = <6>;
 			};
 		};
-			vcnl36866_sleep: vcnl36866_sleep {
+
+		vcnl36866_sleep: vcnl36866_sleep {
 			mux {
 				pins = "gpio89";
 				function = "gpio";
