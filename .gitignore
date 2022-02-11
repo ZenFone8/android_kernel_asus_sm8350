@@ -148,6 +148,8 @@ x509.genkey
 
 # generated defconfigs
 arch/*/configs/vendor/*_defconfig
+!arch/*/configs/vendor/sake_defconfig
+!arch/*/configs/vendor/vodka_defconfig
 
 # vendor device tree directories
 arch/arm64/boot/dts/vendor
