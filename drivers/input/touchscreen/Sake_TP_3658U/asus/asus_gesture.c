@@ -418,7 +418,7 @@ static ssize_t asus_gesture_proc_type_write(struct file *filp, const char *buff,
 
 	if (gesture_type_buf[7] == '1') {
 		fts_data->music_control = ENABLE;
-		printk("[Focal][Touch] music_control enable ! \n");
+		pr_debug("[Focal][Touch] music_control enable ! \n");
 	} else
 		fts_data->music_control = DISABLE;
 

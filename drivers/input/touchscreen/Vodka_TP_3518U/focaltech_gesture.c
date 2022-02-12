@@ -199,10 +199,10 @@ static ssize_t switch_game_mode_store(
 
 	if (tmp == 0) {
 		fts_data->game_mode = 0;
-		printk("[Focal][Touch] game_mode_disable ! \n");
+		pr_debug("[Focal][Touch] game_mode_disable ! \n");
 	} else if (tmp == 1) {
 		fts_data->game_mode = 1;
-		printk("[Focal][Touch] game_mode_enable ! \n");
+		pr_debug("[Focal][Touch] game_mode_enable ! \n");
 	}
 	return count;
 }
@@ -265,15 +265,15 @@ static ssize_t rotation_type_store(
 	if (tmp == 0) {
 		fts_data->rotation_type = 0;
 		fts_enter_game_mode(0);
-		printk("[Focal][Touch] game_mode_disable, rotation = 0 ! \n");
+		pr_debug("[Focal][Touch] game_mode_disable, rotation = 0 ! \n");
 	} else if (tmp == 1) {
 		fts_data->rotation_type = 1;
 		fts_enter_game_mode(1);
-		printk("[Focal][Touch] game_mode_enable, rotation = 90 ! \n");
+		pr_debug("[Focal][Touch] game_mode_enable, rotation = 90 ! \n");
 	} else if (tmp == 2) {
 		fts_data->rotation_type = 2;
 		fts_enter_game_mode(2);
-		printk("[Focal][Touch] game_mode_enable, rotation = 270 ! \n");
+		pr_debug("[Focal][Touch] game_mode_enable, rotation = 270 ! \n");
 	}
 	return count;
 }
@@ -890,10 +890,10 @@ static ssize_t asus_gesture_proc_dclick_write(struct file *filp, const char *buf
 
 	if (strncmp(messages, "0", 1) == 0) {
 		fts_data->dclick_mode = 0;
-		printk("[Focal][Touch] dclick_mode_disable ! \n");
+		pr_debug("[Focal][Touch] dclick_mode_disable ! \n");
 	} else {
 		fts_data->dclick_mode = 1;
-		printk("[Focal][Touch] dclick_mode_enable ! \n");
+		pr_debug("[Focal][Touch] dclick_mode_enable ! \n");
 	}
 	return len;
 }
@@ -927,10 +927,10 @@ static ssize_t asus_gesture_proc_swipeup_write(struct file *filp, const char *bu
 
 	if (strncmp(messages, "0", 1) == 0) {
 		fts_data->swipeup_mode = 0;
-		printk("[Focal][Touch] swipeup_mode_disable ! \n");
+		pr_debug("[Focal][Touch] swipeup_mode_disable ! \n");
 	} else {
 		fts_data->swipeup_mode = 1;
-		printk("[Focal][Touch] swipeup_mode_enable ! \n");
+		pr_debug("[Focal][Touch] swipeup_mode_enable ! \n");
 	}
 	return len;
 }
