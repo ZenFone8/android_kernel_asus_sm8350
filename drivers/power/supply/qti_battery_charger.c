@@ -915,7 +915,7 @@ static int usb_psy_set_prop(struct power_supply *psy,
 	switch (prop) {
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
 #ifdef CONFIG_MACH_ASUS
-		printk(KERN_ERR "[BAT][CHG] INPUT_CURRENT_LIMIT. val : %d uA\n", pval->intval);//ASUS_BSP
+		pr_debug("[BAT][CHG] INPUT_CURRENT_LIMIT. val : %d uA\n", pval->intval);//ASUS_BSP
 #endif
 		rc = usb_psy_set_icl(bcdev, prop_id, pval->intval);
 		break;
