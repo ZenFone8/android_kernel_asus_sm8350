@@ -78,11 +78,11 @@ static int short_test_ch_to_all(struct fts_test *tdata, int *adc, u8 *ab_ch,
 		print_buffer(adc, ch_num + 1, ch_num + 1);
 		print_buffer(short_res, ch_num, ch_num);
 		ab_ch[0] = ab_ch_num;
-		printk("[FTS_TS]ab_ch:");
+		pr_debug("[FTS_TS]ab_ch:");
 		for (i = 0; i < ab_ch_num + 1; i++) {
-			printk("%2d ", ab_ch[i]);
+			pr_debug("%2d ", ab_ch[i]);
 		}
-		printk("\n");
+		pr_debug("\n");
 		*result = false;
 	} else {
 		*result = true;

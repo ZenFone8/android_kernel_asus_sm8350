@@ -248,11 +248,11 @@ void focal_usb_detection(bool plugin)
 	struct fts_ts_data *ts_data = fts_data;
 
 	if (fts_data == NULL) {
-		printk("[Focal][Touch] %s : ftxxxx_ts is null, skip \n", __func__);
+		pr_debug("[Focal][Touch] %s : ftxxxx_ts is null, skip \n", __func__);
 		return;
 	}
 	if (fts_init_success == 0) {
-		printk("[Focal][Touch] %s : ftxxxx_ts is null, skip \n", __func__);
+		pr_debug("[Focal][Touch] %s : ftxxxx_ts is null, skip \n", __func__);
 		return;
 	}
 
