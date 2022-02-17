@@ -150,7 +150,11 @@ int fts_reset_proc(int hdelayms)
 {
 	FTS_DEBUG("tp reset");
 	gpio_direction_output(fts_data->pdata->reset_gpio, 0);
+#if defined ASUS_SAKE_PROJECT
+	msleep(5);
+#else
 	msleep(1);
+#endif
 	gpio_direction_output(fts_data->pdata->reset_gpio, 1);
 	if (hdelayms) {
 		msleep(hdelayms);
