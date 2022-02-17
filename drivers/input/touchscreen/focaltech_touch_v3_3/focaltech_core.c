@@ -575,11 +575,13 @@ static int fts_input_report_b(struct fts_ts_data *data)
 			input_report_abs(data->input_dev, ABS_MT_PRESSURE,
 					 events[i].p);
 #endif
+#if !defined ASUS_SAKE_PROJECT
 			if (events[i].area <= 0) {
 				events[i].area = 0x09;
 			}
 			input_report_abs(data->input_dev, ABS_MT_TOUCH_MAJOR,
 					 events[i].area);
+#endif
 			input_report_abs(data->input_dev, ABS_MT_POSITION_X,
 					 events[i].x);
 			input_report_abs(data->input_dev, ABS_MT_POSITION_Y,
