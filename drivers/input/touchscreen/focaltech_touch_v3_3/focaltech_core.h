@@ -230,6 +230,8 @@ struct fts_ts_data {
 #if defined ASUS_SAKE_PROJECT
 	unsigned int fp_x;
 	unsigned int fp_y;
+	struct work_struct gesture_work;
+	u8 gesture_data[5];
 #endif
 };
 
@@ -261,6 +263,7 @@ void fts_gesture_recovery(struct fts_ts_data *ts_data);
 int fts_gesture_readdata(struct fts_ts_data *ts_data, u8 *data);
 int fts_gesture_suspend(struct fts_ts_data *ts_data);
 int fts_gesture_resume(struct fts_ts_data *ts_data);
+void fts_gesture_reconfigure(struct fts_ts_data *ts_data);
 
 /* Apk and functions */
 int fts_create_apk_debug_channel(struct fts_ts_data *);
@@ -308,5 +311,8 @@ int fts_ex_mode_recovery(struct fts_ts_data *ts_data);
 
 void fts_irq_disable(void);
 void fts_irq_enable(void);
+
+int fts_ts_suspend(struct device *dev);
+int fts_ts_resume(struct device *dev);
 
 #endif /* __LINUX_FOCALTECH_CORE_H__ */

@@ -99,6 +99,37 @@ static struct fts_gesture_st fts_gesture_data;
 /*****************************************************************************
 * Static function prototypes
 *****************************************************************************/
+#if defined ASUS_SAKE_PROJECT
+static void fts_gesture_apply(struct fts_ts_data *ts_data)
+{
+	u8 gesture_regs[] = { 0xD1, 0xD2, 0xD5, 0xD6, 0xD7 };
+	unsigned int i;
+
+	for (i = 0; i < sizeof(ts_data->gesture_data); i++)
+		fts_write_reg(gesture_regs[i], ts_data->gesture_data[i]);
+}
+
+static void fts_gesture_work(struct work_struct *work)
+{
+	struct fts_ts_data *ts_data =
+		container_of(work, struct fts_ts_data, gesture_work);
+	bool suspended = ts_data->suspended;
+	bool gesture_mode = false;
+	unsigned int i;
+
+	memset(ts_data->gesture_data, 0, sizeof(ts_data->gesture_data));
+
+	for (i = 0; i < sizeof(ts_data->gesture_data); i++)
+		if (ts_data->gesture_data[i])
+			gesture_mode = true;
+
+	if (suspended)
+		fts_ts_resume(ts_data->dev);
+	ts_data->gesture_mode = gesture_mode;
+	if (suspended)
+		fts_ts_suspend(ts_data->dev);
+}
+#else
 static ssize_t fts_gesture_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
@@ -183,10 +214,14 @@ static DEVICE_ATTR(fts_gesture_mode, S_IRUGO | S_IWUSR, fts_gesture_show,
  */
 static DEVICE_ATTR(fts_gesture_buf, S_IRUGO | S_IWUSR, fts_gesture_buf_show,
 		   fts_gesture_buf_store);
+#endif
 
 static struct attribute *fts_gesture_mode_attrs[] = {
+#if defined ASUS_SAKE_PROJECT
+#else
 	&dev_attr_fts_gesture_mode.attr,
 	&dev_attr_fts_gesture_buf.attr,
+#endif
 	NULL,
 };
 
@@ -351,6 +386,9 @@ void fts_gesture_recovery(struct fts_ts_data *ts_data)
 {
 	if (ts_data->gesture_mode && ts_data->suspended) {
 		FTS_DEBUG("gesture recovery...");
+#if defined ASUS_SAKE_PROJECT
+		fts_gesture_apply(ts_data);
+#else
 		fts_write_reg(0xD1, 0xFF);
 		fts_write_reg(0xD2, 0xFF);
 		fts_write_reg(0xD5, 0xFF);
@@ -358,6 +396,7 @@ void fts_gesture_recovery(struct fts_ts_data *ts_data)
 		fts_write_reg(0xD7, 0xFF);
 		fts_write_reg(0xD8, 0xFF);
 		fts_write_reg(FTS_REG_GESTURE_EN, ENABLE);
+#endif
 	}
 }
 
@@ -372,12 +411,17 @@ int fts_gesture_suspend(struct fts_ts_data *ts_data)
 	}
 
 	for (i = 0; i < 5; i++) {
+#if defined ASUS_SAKE_PROJECT
+		fts_gesture_apply(ts_data);
+#else
 		fts_write_reg(0xD1, 0xFF);
 		fts_write_reg(0xD2, 0xFF);
 		fts_write_reg(0xD5, 0xFF);
 		fts_write_reg(0xD6, 0xFF);
 		fts_write_reg(0xD7, 0xFF);
 		fts_write_reg(0xD8, 0xFF);
+#endif
+
 		fts_write_reg(FTS_REG_GESTURE_EN, ENABLE);
 		msleep(1);
 		fts_read_reg(FTS_REG_GESTURE_EN, &state);
@@ -459,6 +503,10 @@ int fts_gesture_init(struct fts_ts_data *ts_data)
 	__set_bit(KEY_GESTURE_C, input_dev->keybit);
 	__set_bit(KEY_GESTURE_Z, input_dev->keybit);
 	__set_bit(KEY_WAKEUP, input_dev->keybit);
+
+#if defined ASUS_SAKE_PROJECT
+	INIT_WORK(&ts_data->gesture_work, fts_gesture_work);
+#endif
 
 	fts_create_gesture_sysfs(ts_data->dev);
 
