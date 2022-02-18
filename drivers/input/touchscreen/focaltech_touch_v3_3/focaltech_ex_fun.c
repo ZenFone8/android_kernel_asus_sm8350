@@ -1187,6 +1187,39 @@ static ssize_t asus_ex_proc_fpxy_read(struct file *file, char __user *buf,
 
 	return simple_read_from_buffer(buf, count, ppos, str, len);
 }
+
+static ssize_t asus_gesture_proc_dclick_read(struct file *file,
+					     char __user *buf, size_t count,
+					     loff_t *ppos)
+{
+	struct fts_ts_data *ts_data = fts_data;
+	char str[3];
+	int len;
+
+	len = snprintf(str, sizeof(str), "%c\n",
+		       ts_data->dclick_mode ? '1' : '0');
+
+	return simple_read_from_buffer(buf, count, ppos, str, len);
+}
+
+static ssize_t asus_gesture_proc_dclick_write(struct file *filp,
+					      const char *buf, size_t len,
+					      loff_t *off)
+{
+	struct fts_ts_data *ts_data = fts_data;
+	char str[1];
+
+	if (len > sizeof(str))
+		len = sizeof(str);
+
+	if (copy_from_user(str, buf, len))
+		return -EFAULT;
+
+	ts_data->dclick_mode = str[0] != '0';
+	queue_work(ts_data->ts_workqueue, &ts_data->gesture_work);
+
+	return len;
+}
 #endif
 
 /* get the fw version  example:cat fw_version */
@@ -1243,6 +1276,11 @@ static struct attribute_group fts_attribute_group = { .attrs = fts_attributes };
 static struct file_operations asus_ex_proc_fpxy_ops = {
 	.read = asus_ex_proc_fpxy_read,
 };
+
+static struct file_operations asus_gesture_proc_dclick_ops = {
+	.write = asus_gesture_proc_dclick_write,
+	.read = asus_gesture_proc_dclick_read,
+};
 #endif
 
 int fts_create_sysfs(struct fts_ts_data *ts_data)
@@ -1260,6 +1298,7 @@ int fts_create_sysfs(struct fts_ts_data *ts_data)
 
 #if defined ASUS_SAKE_PROJECT
 	proc_create("driver/fp_xy", 0777, NULL, &asus_ex_proc_fpxy_ops);
+	proc_create("driver/dclick", 0777, NULL, &asus_gesture_proc_dclick_ops);
 #endif
 
 	return ret;
