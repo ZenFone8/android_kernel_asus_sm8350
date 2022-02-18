@@ -232,6 +232,7 @@ struct fts_ts_data {
 	unsigned int fp_y;
 	struct work_struct gesture_work;
 	u8 gesture_data[5];
+	bool dclick_mode;
 #endif
 };
 
