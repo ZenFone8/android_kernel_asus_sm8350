@@ -44,9 +44,10 @@
 #define KEY_GESTURE_RIGHT KEY_RIGHT
 #define KEY_GESTURE_O KEY_O
 #define KEY_GESTURE_E KEY_E
+#define KEY_GESTURE_F KEY_F
 #define KEY_GESTURE_M KEY_M
-#define KEY_GESTURE_L KEY_L
 #define KEY_GESTURE_W KEY_W
+#define KEY_GESTURE_L KEY_L
 #define KEY_GESTURE_S KEY_S
 #define KEY_GESTURE_V KEY_V
 #define KEY_GESTURE_C KEY_C
@@ -57,15 +58,23 @@
 #define GESTURE_UP 0x22
 #define GESTURE_DOWN 0x23
 #define GESTURE_DOUBLECLICK 0x24
-#define GESTURE_O 0x30
 #define GESTURE_W 0x31
 #define GESTURE_M 0x32
 #define GESTURE_E 0x33
-#define GESTURE_L 0x44
 #define GESTURE_S 0x46
 #define GESTURE_V 0x54
 #define GESTURE_Z 0x41
 #define GESTURE_C 0x34
+
+#if defined ASUS_SAKE_PROJECT
+#define GESTURE_F 0x28
+#define GESTURE_L 0x27
+#define GESTURE_O 0x2A
+#define GESTURE_U 0x29
+#else
+#define GESTURE_L 0x44
+#define GESTURE_O 0x30
+#endif
 
 /*****************************************************************************
 * Private enumerations, structures and unions using typedef
@@ -101,6 +110,7 @@ static struct fts_gesture_st fts_gesture_data;
 *****************************************************************************/
 #if defined ASUS_SAKE_PROJECT
 #define FTS_REG_D1_DCLICK_BIT BIT(4)
+#define FTS_REG_D1_FOD_BIT BIT(7)
 
 static void fts_gesture_apply(struct fts_ts_data *ts_data)
 {
@@ -124,6 +134,9 @@ static void fts_gesture_work(struct work_struct *work)
 	if (ts_data->dclick_mode)
 		ts_data->gesture_data[0] |= FTS_REG_D1_DCLICK_BIT;
 
+	if (ts_data->fod_mode)
+		ts_data->gesture_data[0] |= FTS_REG_D1_FOD_BIT;
+
 	for (i = 0; i < sizeof(ts_data->gesture_data); i++)
 		if (ts_data->gesture_data[i])
 			gesture_mode = true;
@@ -134,6 +147,51 @@ static void fts_gesture_work(struct work_struct *work)
 	if (suspended)
 		fts_ts_suspend(ts_data->dev);
 }
+
+static ssize_t fts_fod_mode_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
+{
+	struct fts_ts_data *ts_data = fts_data;
+	int ret;
+
+	mutex_lock(&ts_data->input_dev->mutex);
+	ret = snprintf(buf, PAGE_SIZE, "%c\n", ts_data->fod_mode ? '1' : '0');
+	mutex_unlock(&ts_data->input_dev->mutex);
+
+	return ret;
+}
+
+static ssize_t fts_fod_mode_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
+{
+	struct fts_ts_data *ts_data = fts_data;
+
+	mutex_lock(&ts_data->input_dev->mutex);
+	ts_data->fod_mode = buf[0] != '0';
+	mutex_unlock(&ts_data->input_dev->mutex);
+
+	queue_work(ts_data->ts_workqueue, &ts_data->gesture_work);
+
+	return count;
+}
+
+static ssize_t fts_fod_pressed_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
+{
+	struct fts_ts_data *ts_data = fts_data;
+	int ret;
+
+	mutex_lock(&ts_data->input_dev->mutex);
+	ret = snprintf(buf, PAGE_SIZE, "%u\n", ts_data->fod_pressed);
+	mutex_unlock(&ts_data->input_dev->mutex);
+
+	return ret;
+}
+
+static DEVICE_ATTR(fts_fod_mode, S_IRUGO | S_IWUSR, fts_fod_mode_show,
+		   fts_fod_mode_store);
+static DEVICE_ATTR(fts_fod_pressed, S_IRUGO, fts_fod_pressed_show, NULL);
 #else
 static ssize_t fts_gesture_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -223,6 +281,8 @@ static DEVICE_ATTR(fts_gesture_buf, S_IRUGO | S_IWUSR, fts_gesture_buf_show,
 
 static struct attribute *fts_gesture_mode_attrs[] = {
 #if defined ASUS_SAKE_PROJECT
+	&dev_attr_fts_fod_mode.attr,
+	&dev_attr_fts_fod_pressed.attr,
 #else
 	&dev_attr_fts_gesture_mode.attr,
 	&dev_attr_fts_gesture_buf.attr,
@@ -269,9 +329,11 @@ static void fts_gesture_report(struct input_dev *input_dev, int gesture_id)
 	case GESTURE_DOUBLECLICK:
 		gesture = KEY_WAKEUP;
 		break;
+#if !defined ASUS_SAKE_PROJECT
 	case GESTURE_O:
 		gesture = KEY_GESTURE_O;
 		break;
+#endif
 	case GESTURE_W:
 		gesture = KEY_GESTURE_W;
 		break;
@@ -281,9 +343,11 @@ static void fts_gesture_report(struct input_dev *input_dev, int gesture_id)
 	case GESTURE_E:
 		gesture = KEY_GESTURE_E;
 		break;
+#if !defined ASUS_SAKE_PROJECT
 	case GESTURE_L:
 		gesture = KEY_GESTURE_L;
 		break;
+#endif
 	case GESTURE_S:
 		gesture = KEY_GESTURE_S;
 		break;
@@ -381,6 +445,25 @@ int fts_gesture_readdata(struct fts_ts_data *ts_data, u8 *data)
 		gesture->coordinate_y[i] =
 			(u16)(((buf[2 + index] & 0x0F) << 8) + buf[3 + index]);
 	}
+
+#if defined ASUS_SAKE_PROJECT
+	switch (gesture->gesture_id) {
+	case GESTURE_F:
+	case GESTURE_O:
+		if (gesture->point_num >= 1) {
+			ts_data->fp_x = gesture->coordinate_x[i];
+			ts_data->fp_y = gesture->coordinate_y[i];
+		}
+
+		ts_data->fod_pressed = true;
+
+		sysfs_notify(&ts_data->dev->kobj, NULL, "fts_fod_pressed");
+		return 0;
+	case GESTURE_U:
+		ts_data->fod_pressed = false;
+		return 0;
+	}
+#endif
 
 	/* report gesture to OS */
 	fts_gesture_report(input_dev, gesture->gesture_id);
@@ -484,6 +567,7 @@ int fts_gesture_init(struct fts_ts_data *ts_data)
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_RIGHT);
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_O);
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_E);
+	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_F);
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_M);
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_L);
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_W);
@@ -500,6 +584,7 @@ int fts_gesture_init(struct fts_ts_data *ts_data)
 	__set_bit(KEY_GESTURE_U, input_dev->keybit);
 	__set_bit(KEY_GESTURE_O, input_dev->keybit);
 	__set_bit(KEY_GESTURE_E, input_dev->keybit);
+	__set_bit(KEY_GESTURE_F, input_dev->keybit);
 	__set_bit(KEY_GESTURE_M, input_dev->keybit);
 	__set_bit(KEY_GESTURE_W, input_dev->keybit);
 	__set_bit(KEY_GESTURE_L, input_dev->keybit);
