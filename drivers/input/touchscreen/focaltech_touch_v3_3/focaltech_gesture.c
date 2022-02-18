@@ -100,6 +100,8 @@ static struct fts_gesture_st fts_gesture_data;
 * Static function prototypes
 *****************************************************************************/
 #if defined ASUS_SAKE_PROJECT
+#define FTS_REG_D1_DCLICK_BIT BIT(4)
+
 static void fts_gesture_apply(struct fts_ts_data *ts_data)
 {
 	u8 gesture_regs[] = { 0xD1, 0xD2, 0xD5, 0xD6, 0xD7 };
@@ -118,6 +120,9 @@ static void fts_gesture_work(struct work_struct *work)
 	unsigned int i;
 
 	memset(ts_data->gesture_data, 0, sizeof(ts_data->gesture_data));
+
+	if (ts_data->dclick_mode)
+		ts_data->gesture_data[0] |= FTS_REG_D1_DCLICK_BIT;
 
 	for (i = 0; i < sizeof(ts_data->gesture_data); i++)
 		if (ts_data->gesture_data[i])
