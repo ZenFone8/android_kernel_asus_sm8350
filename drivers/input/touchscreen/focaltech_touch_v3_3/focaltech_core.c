@@ -164,6 +164,10 @@ int fts_reset_proc(int hdelayms)
 		msleep(hdelayms);
 	}
 
+#if defined ASUS_SAKE_PROJECT
+	fts_write_reg(FTS_REG_REPORT_RATE, 1);
+#endif
+
 	return 0;
 }
 
