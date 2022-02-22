@@ -235,6 +235,9 @@ struct fts_ts_data {
 	bool dclick_mode;
 	bool fod_mode;
 	bool fod_pressed;
+	unsigned int fod_last_press_area;
+	unsigned int fod_last_press_id;
+	unsigned int fod_position[4];
 #endif
 };
 
