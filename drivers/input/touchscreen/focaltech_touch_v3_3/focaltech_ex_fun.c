@@ -1207,6 +1207,7 @@ static ssize_t asus_gesture_proc_dclick_write(struct file *filp,
 					      loff_t *off)
 {
 	struct fts_ts_data *ts_data = fts_data;
+	bool dclick_mode;
 	char str[1];
 
 	if (len > sizeof(str))
@@ -1215,7 +1216,11 @@ static ssize_t asus_gesture_proc_dclick_write(struct file *filp,
 	if (copy_from_user(str, buf, len))
 		return -EFAULT;
 
-	ts_data->dclick_mode = str[0] != '0';
+	dclick_mode = str[0] != '0';
+	if (ts_data->dclick_mode == dclick_mode)
+		return len;
+
+	ts_data->dclick_mode = dclick_mode;
 	queue_work(ts_data->ts_workqueue, &ts_data->gesture_work);
 
 	return len;
