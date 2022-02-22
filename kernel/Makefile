@@ -138,6 +138,7 @@ $(obj)/config_data: $(KCONFIG_CONFIG) FORCE
 	echo "CONFIG_SHADOW_CALL_STACK=y" >> $@
 	echo "CONFIG_LTO_CLANG=y" >> $@
 	echo "CONFIG_CFI_CLANG=y" >> $@
+	echo "CONFIG_PROFILING=y" >> $@
 
 $(obj)/kheaders.o: $(obj)/kheaders_data.tar.xz
 
