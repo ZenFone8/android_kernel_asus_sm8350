@@ -168,12 +168,23 @@ static ssize_t fts_fod_mode_store(struct device *dev,
 				  const char *buf, size_t count)
 {
 	struct fts_ts_data *ts_data = fts_data;
+	bool fod_mode;
+
+	fod_mode = buf[0] != '0';
 
 	mutex_lock(&ts_data->input_dev->mutex);
-	ts_data->fod_mode = buf[0] != '0';
+	if (ts_data->fod_mode == fod_mode)
+		goto unlock;
+
+	ts_data->fod_mode = fod_mode;
 	mutex_unlock(&ts_data->input_dev->mutex);
 
 	queue_work(ts_data->ts_workqueue, &ts_data->gesture_work);
+
+	return count;
+
+unlock:
+	mutex_unlock(&ts_data->input_dev->mutex);
 
 	return count;
 }
