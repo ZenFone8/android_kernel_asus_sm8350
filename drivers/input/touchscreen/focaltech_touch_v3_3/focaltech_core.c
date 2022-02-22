@@ -808,7 +808,7 @@ skip_touch_data_read:
 		ret = fts_gesture_readdata(data, buf + FTS_TOUCH_DATA_LEN);
 #endif
 		if (0 == ret) {
-			FTS_INFO("succuss to get gesture data in irq handler");
+			FTS_DEBUG("succuss to get gesture data in irq handler");
 			return 1;
 		}
 	}
