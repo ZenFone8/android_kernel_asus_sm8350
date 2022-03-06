@@ -1683,7 +1683,7 @@ static uint8_t lim_get_num_tpe_octets(uint8_t max_transmit_power_count)
 	if (!max_transmit_power_count)
 		return max_transmit_power_count;
 
-	return 1 << (max_transmit_power_count - 1);
+	return 1 << (max_transmit_power_count);
 }
 
 void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
