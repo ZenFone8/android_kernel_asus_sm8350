@@ -286,6 +286,7 @@ struct battery_chg_dev {
 	struct pmic_glink_client	*client_oem;
 	struct gpio_desc		*otg_switch;
 	bool				usb_present;
+	bool				usb_online;
 	struct iio_channel		*temp_chan;
 	struct delayed_work		usb_thermal_work;
 #endif
@@ -1080,6 +1081,20 @@ static int usb_psy_set_icl(struct battery_chg_dev *bcdev, u32 prop_id, int val)
 	return rc;
 }
 
+#ifdef CONFIG_MACH_ASUS
+static void handle_charging_status(struct battery_chg_dev *bcdev, bool status)
+{
+	if (bcdev->usb_online == status)
+		return;
+
+	bcdev->usb_online = status;
+
+	if (status) {
+	} else {
+	}
+}
+#endif
+
 static int usb_psy_get_prop(struct power_supply *psy,
 		enum power_supply_property prop,
 		union power_supply_propval *pval)
@@ -1101,8 +1116,12 @@ static int usb_psy_get_prop(struct power_supply *psy,
 	pval->intval = pst->prop[prop_id];
 	if (prop == POWER_SUPPLY_PROP_TEMP)
 		pval->intval = DIV_ROUND_CLOSEST((int)pval->intval, 10);
-	else if (prop == POWER_SUPPLY_PROP_ONLINE)
+	else if (prop == POWER_SUPPLY_PROP_ONLINE) {
+#ifdef CONFIG_MACH_ASUS
+		handle_charging_status(bcdev, pval->intval);
+#endif
 		qti_charge_notify(pval->intval);
+	}
 
 	return 0;
 }
