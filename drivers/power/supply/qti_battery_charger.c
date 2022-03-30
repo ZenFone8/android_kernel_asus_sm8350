@@ -51,6 +51,14 @@
 #define WLS_FW_BUF_SIZE			128
 #define DEFAULT_RESTRICT_FCC_UA		1000000
 
+#ifdef CONFIG_MACH_ASUS
+#define MSG_OWNER_OEM			32782
+
+#define OEM_OPCODE_WRITE_BUFFER		0x10001
+
+#define OEM_PROPERTY_MAX_DATA_SIZE	16
+#endif
+
 enum psy_type {
 	PSY_TYPE_BATTERY,
 	PSY_TYPE_USB,
@@ -201,6 +209,21 @@ struct battery_charger_ship_mode_req_msg {
 	u32			ship_mode_type;
 };
 
+#ifdef CONFIG_MACH_ASUS
+struct oem_write_buffer_req_msg {
+	struct pmic_glink_hdr hdr;
+	u32 oem_property_id;
+	u32 data_buffer[OEM_PROPERTY_MAX_DATA_SIZE];
+	u32 data_size;
+};
+
+struct oem_write_buffer_resp_msg {
+	struct pmic_glink_hdr hdr;
+	u32 oem_property_id;
+	u32 return_status;
+};
+#endif
+
 struct psy_state {
 	struct power_supply	*psy;
 	char			*model;
@@ -243,6 +266,10 @@ struct battery_chg_dev {
 	bool				restrict_chg_en;
 	/* To track the driver initialization status */
 	bool				initialized;
+
+#ifdef CONFIG_MACH_ASUS
+	struct pmic_glink_client	*client_oem;
+#endif
 };
 
 static const int battery_prop_map[BATT_PROP_MAX] = {
@@ -418,6 +445,24 @@ static int read_property_id(struct battery_chg_dev *bcdev,
 	return battery_chg_write(bcdev, &req_msg, sizeof(req_msg));
 }
 
+#ifdef CONFIG_MACH_ASUS
+static int write_property_id_oem(struct battery_chg_dev *bcdev, u32 prop_id,
+				 u32 *buf, size_t count)
+{
+	struct oem_write_buffer_req_msg req_msg = { { 0 } };
+
+	req_msg.hdr.owner = MSG_OWNER_OEM;
+	req_msg.hdr.type = MSG_TYPE_REQ_RESP;
+	req_msg.hdr.opcode = OEM_OPCODE_WRITE_BUFFER;
+	req_msg.oem_property_id = prop_id;
+	req_msg.data_size = count;
+
+	memcpy(req_msg.data_buffer, buf, sizeof(u32) * count);
+
+	return battery_chg_write(bcdev, &req_msg, sizeof(req_msg));
+}
+#endif
+
 static int get_property_id(struct psy_state *pst,
 			enum power_supply_property prop)
 {
@@ -458,6 +503,12 @@ static void battery_chg_state_cb(void *priv, enum pmic_glink_state state)
 	if (state == PMIC_GLINK_STATE_UP)
 		schedule_work(&bcdev->subsys_up_work);
 }
+
+#ifdef CONFIG_MACH_ASUS
+static void battery_chg_state_cb_oem(void *priv, enum pmic_glink_state state)
+{
+}
+#endif
 
 /**
  * qti_battery_charger_get_prop() - Gets the property being requested
@@ -760,6 +811,82 @@ static int battery_chg_callback(void *priv, void *data, size_t len)
 
 	return 0;
 }
+
+#ifdef CONFIG_MACH_ASUS
+#define CHECK_LENGTH(msg)						\
+	if (len != sizeof(*msg)) {					\
+		pr_err("Bad response length %zu for opcode %u\n",	\
+		       len, hdr->opcode);				\
+		break;							\
+	}								\
+
+static void handle_notification_oem(struct battery_chg_dev *bcdev, void *data,
+				    size_t len)
+{
+	struct pmic_glink_hdr *hdr = data;
+
+	switch (hdr->opcode) {
+	default:
+		pr_err("Unknown opcode: %u\n", hdr->opcode);
+		break;
+	}
+}
+
+static void handle_message_oem(struct battery_chg_dev *bcdev, void *data,
+			       size_t len)
+{
+	struct oem_write_buffer_resp_msg *resp_msg;
+	struct pmic_glink_hdr *hdr = data;
+	bool ack_set = false;
+
+	switch (hdr->opcode) {
+	case OEM_OPCODE_WRITE_BUFFER:
+		CHECK_LENGTH(resp_msg);
+
+		resp_msg = data;
+
+		switch (resp_msg->oem_property_id) {
+		default:
+			ack_set = true;
+			pr_err("Unknown property_id: %u\n",
+			       resp_msg->oem_property_id);
+			break;
+		}
+		break;
+	default:
+		pr_err("Unknown opcode: %u\n", hdr->opcode);
+		ack_set = true;
+		break;
+	}
+
+	if (ack_set)
+		complete(&bcdev->ack);
+}
+
+static int battery_chg_cb_oem(void *priv, void *data, size_t len)
+{
+	struct pmic_glink_hdr *hdr = data;
+	struct battery_chg_dev *bcdev = priv;
+
+	pr_debug("owner: %u type: %u opcode: %#x len: %zu\n", hdr->owner,
+		hdr->type, hdr->opcode, len);
+
+	if (!bcdev->initialized) {
+		pr_debug("Driver initialization failed: Dropping glink callback message: state %d\n",
+			 bcdev->state);
+		return 0;
+	}
+
+	if (hdr->owner == MSG_OWNER_OEM) {
+		if (hdr->type == MSG_TYPE_NOTIFY)
+			handle_notification_oem(bcdev, data, len);
+		else
+			handle_message_oem(bcdev, data, len);
+	}
+
+	return 0;
+}
+#endif
 
 static int wls_psy_get_prop(struct power_supply *psy,
 		enum power_supply_property prop,
@@ -1946,6 +2073,23 @@ static int battery_chg_probe(struct platform_device *pdev)
 				rc);
 		return rc;
 	}
+
+#ifdef CONFIG_MACH_ASUS
+	client_data.id = MSG_OWNER_OEM;
+	client_data.name = "asus_BC";
+	client_data.msg_cb = battery_chg_cb_oem;
+	client_data.priv = bcdev;
+	client_data.state_cb = battery_chg_state_cb_oem;
+
+	bcdev->client_oem = pmic_glink_register_client(dev, &client_data);
+	if (IS_ERR(bcdev->client_oem)) {
+		rc = PTR_ERR(bcdev->client_oem);
+		if (rc != -EPROBE_DEFER)
+			dev_err(dev, "Error in registering with pmic_glink %d\n",
+				rc);
+		return rc;
+	}
+#endif
 
 	bcdev->initialized = true;
 	bcdev->reboot_notifier.notifier_call = battery_chg_ship_mode;
