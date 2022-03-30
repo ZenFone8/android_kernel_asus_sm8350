@@ -14,6 +14,8 @@ enum battery_charger_prop {
 #if IS_ENABLED(CONFIG_QTI_BATTERY_CHARGER)
 int qti_battery_charger_get_prop(const char *name,
 				enum battery_charger_prop prop_id, int *val);
+void qti_charge_register_notify(struct notifier_block *nb);
+void qti_charge_unregister_notify(struct notifier_block *nb);
 #else
 static inline int
 qti_battery_charger_get_prop(const char *name,
@@ -21,6 +23,8 @@ qti_battery_charger_get_prop(const char *name,
 {
 	return -EINVAL;
 }
+void qti_charge_register_notify(struct notifier_block *nb) {}
+void qti_charge_unregister_notify(struct notifier_block *nb) {}
 #endif
 
 #endif
