@@ -10,6 +10,7 @@
 #include <linux/device.h>
 #include <linux/firmware.h>
 #include <linux/gpio/consumer.h>
+#include <linux/iio/consumer.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
@@ -54,6 +55,11 @@
 
 #ifdef CONFIG_MACH_ASUS
 #define MSG_OWNER_OEM			32782
+
+#define OEM_THERMAL_ALERT_SET		17
+#define THERMAL_ALERT_NONE		0
+#define THERMAL_ALERT_NO_AC		1
+#define THERMAL_ALERT_WITH_AC		2
 
 #define OEM_OPCODE_WRITE_BUFFER		0x10001
 
@@ -280,6 +286,8 @@ struct battery_chg_dev {
 	struct pmic_glink_client	*client_oem;
 	struct gpio_desc		*otg_switch;
 	bool				usb_present;
+	struct iio_channel		*temp_chan;
+	struct delayed_work		usb_thermal_work;
 #endif
 };
 
@@ -824,6 +832,43 @@ static int battery_chg_callback(void *priv, void *data, size_t len)
 }
 
 #ifdef CONFIG_MACH_ASUS
+#define TEMP_TRIGGER			70000
+#define TEMP_RELEASE			60000
+#define USB_THERMAL_WORK_MSECS		60000
+
+static void usb_thermal_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct battery_chg_dev *bcdev = container_of(dwork,
+						     struct battery_chg_dev,
+						     usb_thermal_work);
+	int temp;
+	u32 tmp;
+	int rc;
+
+	rc = iio_read_channel_processed(bcdev->temp_chan, &temp);
+	if (rc < 0) {
+		dev_err(bcdev->dev, "Failed to read temperature, rc=%d\n", rc);
+		goto out;
+	}
+
+	if (bcdev->usb_present && temp > TEMP_TRIGGER)
+		tmp = THERMAL_ALERT_WITH_AC;
+	else if (temp > TEMP_TRIGGER)
+		tmp = THERMAL_ALERT_NO_AC;
+	else if (temp < TEMP_RELEASE)
+		tmp = THERMAL_ALERT_NONE;
+
+	rc = write_property_id_oem(bcdev, OEM_THERMAL_ALERT_SET, &tmp, 1);
+	if (rc)
+		dev_err(bcdev->dev, "Failed to write thermal alert %u, rc=%d\n",
+			tmp, rc);
+
+out:
+	schedule_delayed_work(&bcdev->usb_thermal_work,
+			      msecs_to_jiffies(USB_THERMAL_WORK_MSECS));
+}
+
 #define CHECK_LENGTH(msg)						\
 	if (len != sizeof(*msg)) {					\
 		pr_err("Bad response length %zu for opcode %u\n",	\
@@ -870,6 +915,9 @@ static void handle_message_oem(struct battery_chg_dev *bcdev, void *data,
 		resp_msg = data;
 
 		switch (resp_msg->oem_property_id) {
+		case OEM_THERMAL_ALERT_SET:
+			ack_set = true;
+			break;
 		default:
 			ack_set = true;
 			pr_err("Unknown property_id: %u\n",
@@ -2008,6 +2056,13 @@ static int battery_chg_parse_dt(struct battery_chg_dev *bcdev)
 		pr_err("Failed to get otg switch gpio, rc=%d\n", rc);
 		return rc;
 	}
+
+	bcdev->temp_chan = iio_channel_get(bcdev->dev, "pm8350b_amux_thm4");
+	if (IS_ERR(bcdev->temp_chan)) {
+		rc = PTR_ERR(bcdev->temp_chan);
+		pr_err("Failed to get temp channel, rc=%d\n", rc);
+		return rc;
+	}
 #endif
 
 	return 0;
@@ -2135,6 +2190,11 @@ static int battery_chg_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to parse dt rc=%d\n", rc);
 		goto error;
 	}
+
+#ifdef CONFIG_MACH_ASUS
+	INIT_DELAYED_WORK(&bcdev->usb_thermal_work, usb_thermal_worker);
+	schedule_delayed_work(&bcdev->usb_thermal_work, 0);
+#endif
 
 	bcdev->restrict_fcc_ua = DEFAULT_RESTRICT_FCC_UA;
 	platform_set_drvdata(pdev, bcdev);
