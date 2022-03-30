@@ -9,6 +9,7 @@
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/firmware.h>
+#include <linux/gpio/consumer.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
@@ -57,6 +58,8 @@
 #define OEM_OPCODE_WRITE_BUFFER		0x10001
 
 #define OEM_PROPERTY_MAX_DATA_SIZE	16
+
+#define OEM_SET_OTG_WA			0x2107
 #endif
 
 enum psy_type {
@@ -222,6 +225,11 @@ struct oem_write_buffer_resp_msg {
 	u32 oem_property_id;
 	u32 return_status;
 };
+
+struct oem_enable_change_msg {
+	struct pmic_glink_hdr hdr;
+	u32 enable;
+};
 #endif
 
 struct psy_state {
@@ -269,6 +277,7 @@ struct battery_chg_dev {
 
 #ifdef CONFIG_MACH_ASUS
 	struct pmic_glink_client	*client_oem;
+	struct gpio_desc		*otg_switch;
 #endif
 };
 
@@ -823,9 +832,16 @@ static int battery_chg_callback(void *priv, void *data, size_t len)
 static void handle_notification_oem(struct battery_chg_dev *bcdev, void *data,
 				    size_t len)
 {
+	struct oem_enable_change_msg *enable_change_msg;
 	struct pmic_glink_hdr *hdr = data;
 
 	switch (hdr->opcode) {
+	case OEM_SET_OTG_WA:
+		CHECK_LENGTH(enable_change_msg);
+
+		enable_change_msg = data;
+		gpiod_set_value(bcdev->otg_switch, enable_change_msg->enable);
+		break;
 	default:
 		pr_err("Unknown opcode: %u\n", hdr->opcode);
 		break;
@@ -1975,6 +1991,16 @@ static int battery_chg_parse_dt(struct battery_chg_dev *bcdev)
 
 	bcdev->num_thermal_levels = len;
 	bcdev->thermal_fcc_ua = pst->prop[BATT_CHG_CTRL_LIM_MAX];
+
+#ifdef CONFIG_MACH_ASUS
+	bcdev->otg_switch = devm_gpiod_get(bcdev->dev, "OTG_LOAD_SWITCH",
+					   GPIOD_OUT_LOW);
+	if (IS_ERR(bcdev->otg_switch)) {
+		rc = PTR_ERR(bcdev->otg_switch);
+		pr_err("Failed to get otg switch gpio, rc=%d\n", rc);
+		return rc;
+	}
+#endif
 
 	return 0;
 }
