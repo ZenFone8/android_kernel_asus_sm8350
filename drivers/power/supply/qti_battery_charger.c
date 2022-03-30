@@ -60,6 +60,7 @@
 #define OEM_PROPERTY_MAX_DATA_SIZE	16
 
 #define OEM_SET_OTG_WA			0x2107
+#define OEM_USB_PRESENT			0x2108
 #endif
 
 enum psy_type {
@@ -278,6 +279,7 @@ struct battery_chg_dev {
 #ifdef CONFIG_MACH_ASUS
 	struct pmic_glink_client	*client_oem;
 	struct gpio_desc		*otg_switch;
+	bool				usb_present;
 #endif
 };
 
@@ -841,6 +843,12 @@ static void handle_notification_oem(struct battery_chg_dev *bcdev, void *data,
 
 		enable_change_msg = data;
 		gpiod_set_value(bcdev->otg_switch, enable_change_msg->enable);
+		break;
+	case OEM_USB_PRESENT:
+		CHECK_LENGTH(enable_change_msg);
+
+		enable_change_msg = data;
+		bcdev->usb_present = enable_change_msg->enable;
 		break;
 	default:
 		pr_err("Unknown opcode: %u\n", hdr->opcode);
