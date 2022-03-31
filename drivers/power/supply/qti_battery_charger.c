@@ -57,6 +57,7 @@
 #define MSG_OWNER_OEM			32782
 
 #define OEM_WORK_EVENT			16
+#define WORK_JEITA_RULE			0
 #define WORK_JEITA_PRECHG		1
 #define WORK_JEITA_CC			2
 #define WORK_PANEL_CHECK		3
@@ -68,6 +69,9 @@
 #define THERMAL_ALERT_WITH_AC		2
 
 #define OEM_THERMAL_THRESHOLD		23
+
+#define JETA_NONE			0
+#define JETA_CV				4
 
 #define OEM_OPCODE_WRITE_BUFFER		0x10001
 
@@ -317,6 +321,7 @@ struct battery_chg_dev {
 	struct delayed_work		thermal_policy_work;
 	struct delayed_work		panel_check_work;
 	struct delayed_work		workaround_18w_work;
+	struct delayed_work		jeita_rule_work;
 	struct delayed_work		jeita_prechg_work;
 	struct delayed_work		jeita_cc_work;
 	int				jeita_cc_state;
@@ -954,6 +959,22 @@ static void workaround_18w_worker(struct work_struct *work)
 	write_property_work_event(bcdev, WORK_18W_WORKAROUND);
 }
 
+static void jeita_rule_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct battery_chg_dev *bcdev = container_of(dwork,
+						     struct battery_chg_dev,
+						     jeita_rule_work);
+
+	write_property_work_event(bcdev, WORK_JEITA_RULE);
+
+	schedule_delayed_work(&bcdev->jeita_rule_work, 60 * HZ);
+
+	if (bcdev->jeita_cc_state > JETA_NONE &&
+	    bcdev->jeita_cc_state < JETA_CV)
+		__pm_wakeup_event(bcdev->slowchg_ws, 60 * 1000);
+}
+
 static void jeita_prechg_worker(struct work_struct *work)
 {
 	struct delayed_work *dwork = to_delayed_work(work);
@@ -1236,6 +1257,9 @@ static void handle_charging_status(struct battery_chg_dev *bcdev, bool status)
 	bcdev->usb_online = status;
 
 	if (status) {
+		cancel_delayed_work_sync(&bcdev->jeita_rule_work);
+		schedule_delayed_work(&bcdev->jeita_rule_work, 0);
+
 		if (!g_Charger_mode) {
 			cancel_delayed_work_sync(&bcdev->panel_check_work);
 			schedule_delayed_work(&bcdev->panel_check_work, 62 * HZ);
@@ -1249,6 +1273,7 @@ static void handle_charging_status(struct battery_chg_dev *bcdev, bool status)
 
 		__pm_wakeup_event(bcdev->slowchg_ws, 60 * 1000);
 	} else {
+		cancel_delayed_work_sync(&bcdev->jeita_rule_work);
 		cancel_delayed_work_sync(&bcdev->jeita_prechg_work);
 		cancel_delayed_work_sync(&bcdev->jeita_cc_work);
 		cancel_delayed_work_sync(&bcdev->panel_check_work);
@@ -2407,6 +2432,7 @@ static int battery_chg_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&bcdev->panel_check_work, panel_check_worker);
 	INIT_DELAYED_WORK(&bcdev->workaround_18w_work, workaround_18w_worker);
 	INIT_DELAYED_WORK(&bcdev->thermal_policy_work, thermal_policy_worker);
+	INIT_DELAYED_WORK(&bcdev->jeita_rule_work, jeita_rule_worker);
 	INIT_DELAYED_WORK(&bcdev->jeita_prechg_work, jeita_prechg_worker);
 	INIT_DELAYED_WORK(&bcdev->jeita_cc_work, jeita_cc_worker);
 #endif
