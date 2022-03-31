@@ -69,6 +69,8 @@
 #define THERMAL_ALERT_NO_AC		1
 #define THERMAL_ALERT_WITH_AC		2
 
+#define OEM_CHG_MODE			22
+
 #define OEM_THERMAL_THRESHOLD		23
 
 #define JETA_NONE			0
@@ -321,6 +323,7 @@ struct battery_chg_dev {
 	int				thermal_threshold;
 	struct delayed_work		thermal_policy_work;
 	struct delayed_work		panel_check_work;
+	struct delayed_work		charger_mode_work;
 	struct delayed_work		workaround_18w_work;
 	struct delayed_work		jeita_rule_work;
 	struct delayed_work		jeita_prechg_work;
@@ -926,6 +929,27 @@ static void thermal_policy_worker(struct work_struct *work)
 	schedule_delayed_work(&bcdev->thermal_policy_work, 10 * HZ);
 }
 
+extern bool g_Charger_mode;
+
+static void charger_mode_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct battery_chg_dev *bcdev = container_of(dwork,
+						     struct battery_chg_dev,
+						     charger_mode_work);
+
+	u32 tmp = g_Charger_mode;
+	int rc;
+
+	rc = write_property_id_oem(bcdev, OEM_CHG_MODE, &tmp, 1);
+	if (rc)
+		dev_err(bcdev->dev,
+			"Failed to write thermal threshold %u, rc=%d\n",
+			tmp, rc);
+
+	schedule_delayed_work(&bcdev->thermal_policy_work, 10 * HZ);
+}
+
 static int write_property_work_event(struct battery_chg_dev *bcdev, u32 event)
 {
 	int rc;
@@ -1096,6 +1120,7 @@ static void handle_message_oem(struct battery_chg_dev *bcdev, void *data,
 		case OEM_THERMAL_ALERT_SET:
 		case OEM_THERMAL_THRESHOLD:
 		case OEM_WORK_EVENT:
+		case OEM_CHG_MODE:
 			ack_set = true;
 			break;
 		default:
@@ -2445,6 +2470,9 @@ static int battery_chg_probe(struct platform_device *pdev)
 
 	INIT_DELAYED_WORK(&bcdev->full_cap_monitor_work, full_cap_monitor_worker);
 	schedule_delayed_work(&bcdev->full_cap_monitor_work, 0);
+
+	INIT_DELAYED_WORK(&bcdev->charger_mode_work, charger_mode_worker);
+	schedule_delayed_work(&bcdev->charger_mode_work, 0);
 
 	INIT_DELAYED_WORK(&bcdev->panel_check_work, panel_check_worker);
 	INIT_DELAYED_WORK(&bcdev->workaround_18w_work, workaround_18w_worker);
