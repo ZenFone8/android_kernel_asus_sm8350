@@ -61,6 +61,7 @@
 #define WORK_JEITA_PRECHG		1
 #define WORK_JEITA_CC			2
 #define WORK_PANEL_CHECK		3
+#define WORK_LONG_FULL_CAP		4
 #define WORK_18W_WORKAROUND		5
 
 #define OEM_THERMAL_ALERT_SET		17
@@ -325,6 +326,7 @@ struct battery_chg_dev {
 	struct delayed_work		jeita_prechg_work;
 	struct delayed_work		jeita_cc_work;
 	int				jeita_cc_state;
+	struct delayed_work		full_cap_monitor_work;
 #endif
 };
 
@@ -997,6 +999,18 @@ static void jeita_cc_worker(struct work_struct *work)
 	write_property_work_event(bcdev, WORK_JEITA_CC);
 
 	schedule_delayed_work(&bcdev->jeita_cc_work, 5 * HZ);
+}
+
+static void full_cap_monitor_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct battery_chg_dev *bcdev = container_of(dwork,
+						     struct battery_chg_dev,
+						     full_cap_monitor_work);
+
+	write_property_work_event(bcdev, WORK_LONG_FULL_CAP);
+
+	schedule_delayed_work(&bcdev->full_cap_monitor_work, 30 * HZ);
 }
 
 #define CHECK_LENGTH(msg)						\
@@ -2428,6 +2442,9 @@ static int battery_chg_probe(struct platform_device *pdev)
 #ifdef CONFIG_MACH_ASUS
 	INIT_DELAYED_WORK(&bcdev->usb_thermal_work, usb_thermal_worker);
 	schedule_delayed_work(&bcdev->usb_thermal_work, 0);
+
+	INIT_DELAYED_WORK(&bcdev->full_cap_monitor_work, full_cap_monitor_worker);
+	schedule_delayed_work(&bcdev->full_cap_monitor_work, 0);
 
 	INIT_DELAYED_WORK(&bcdev->panel_check_work, panel_check_worker);
 	INIT_DELAYED_WORK(&bcdev->workaround_18w_work, workaround_18w_worker);
