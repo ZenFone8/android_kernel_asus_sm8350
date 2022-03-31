@@ -291,6 +291,7 @@ struct battery_chg_dev {
 #ifdef CONFIG_MACH_ASUS
 	struct class			asuslib_class;
 	struct pmic_glink_client	*client_oem;
+	struct wakeup_source		*slowchg_ws;
 	struct gpio_desc		*otg_switch;
 	bool				usb_present;
 	bool				usb_online;
@@ -1168,6 +1169,8 @@ static void handle_charging_status(struct battery_chg_dev *bcdev, bool status)
 
 		cancel_delayed_work_sync(&bcdev->thermal_policy_work);
 		schedule_delayed_work(&bcdev->thermal_policy_work, 68 * HZ);
+
+		__pm_wakeup_event(bcdev->slowchg_ws, 60 * 1000);
 	} else {
 		cancel_delayed_work_sync(&bcdev->panel_check_work);
 		cancel_delayed_work_sync(&bcdev->workaround_18w_work);
@@ -2300,6 +2303,11 @@ static int battery_chg_probe(struct platform_device *pdev)
 				rc);
 		return rc;
 	}
+#endif
+
+#ifdef CONFIG_MACH_ASUS
+	bcdev->slowchg_ws = wakeup_source_register(bcdev->dev,
+						   "Slowchg_wakelock");
 #endif
 
 	bcdev->initialized = true;
