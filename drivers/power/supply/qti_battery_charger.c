@@ -56,6 +56,9 @@
 #ifdef CONFIG_MACH_ASUS
 #define MSG_OWNER_OEM			32782
 
+#define OEM_WORK_EVENT			16
+#define WORK_18W_WORKAROUND		5
+
 #define OEM_THERMAL_ALERT_SET		17
 #define THERMAL_ALERT_NONE		0
 #define THERMAL_ALERT_NO_AC		1
@@ -294,6 +297,7 @@ struct battery_chg_dev {
 	struct delayed_work		usb_thermal_work;
 	int				thermal_threshold;
 	struct delayed_work		thermal_policy_work;
+	struct delayed_work		workaround_18w_work;
 #endif
 };
 
@@ -893,6 +897,29 @@ static void thermal_policy_worker(struct work_struct *work)
 	schedule_delayed_work(&bcdev->thermal_policy_work, 10 * HZ);
 }
 
+static int write_property_work_event(struct battery_chg_dev *bcdev, u32 event)
+{
+	int rc;
+
+	rc = write_property_id_oem(bcdev, OEM_WORK_EVENT, &event, 1);
+	if (rc)
+		dev_err(bcdev->dev,
+			"Failed to write work event %u, rc=%d\n",
+			event, rc);
+
+	return rc;
+}
+
+static void workaround_18w_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct battery_chg_dev *bcdev = container_of(dwork,
+						     struct battery_chg_dev,
+						     workaround_18w_work);
+
+	write_property_work_event(bcdev, WORK_18W_WORKAROUND);
+}
+
 #define CHECK_LENGTH(msg)						\
 	if (len != sizeof(*msg)) {					\
 		pr_err("Bad response length %zu for opcode %u\n",	\
@@ -941,6 +968,7 @@ static void handle_message_oem(struct battery_chg_dev *bcdev, void *data,
 		switch (resp_msg->oem_property_id) {
 		case OEM_THERMAL_ALERT_SET:
 		case OEM_THERMAL_THRESHOLD:
+		case OEM_WORK_EVENT:
 			ack_set = true;
 			break;
 		default:
@@ -1114,9 +1142,13 @@ static void handle_charging_status(struct battery_chg_dev *bcdev, bool status)
 	bcdev->usb_online = status;
 
 	if (status) {
+		cancel_delayed_work_sync(&bcdev->workaround_18w_work);
+		schedule_delayed_work(&bcdev->workaround_18w_work, 26 * HZ);
+
 		cancel_delayed_work_sync(&bcdev->thermal_policy_work);
 		schedule_delayed_work(&bcdev->thermal_policy_work, 68 * HZ);
 	} else {
+		cancel_delayed_work_sync(&bcdev->workaround_18w_work);
 		cancel_delayed_work_sync(&bcdev->thermal_policy_work);
 	}
 }
@@ -2263,6 +2295,7 @@ static int battery_chg_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&bcdev->usb_thermal_work, usb_thermal_worker);
 	schedule_delayed_work(&bcdev->usb_thermal_work, 0);
 
+	INIT_DELAYED_WORK(&bcdev->workaround_18w_work, workaround_18w_worker);
 	INIT_DELAYED_WORK(&bcdev->thermal_policy_work, thermal_policy_worker);
 #endif
 
