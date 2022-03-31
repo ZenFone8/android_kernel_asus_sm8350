@@ -57,6 +57,7 @@
 #define MSG_OWNER_OEM			32782
 
 #define OEM_WORK_EVENT			16
+#define WORK_PANEL_CHECK		3
 #define WORK_18W_WORKAROUND		5
 
 #define OEM_THERMAL_ALERT_SET		17
@@ -297,6 +298,7 @@ struct battery_chg_dev {
 	struct delayed_work		usb_thermal_work;
 	int				thermal_threshold;
 	struct delayed_work		thermal_policy_work;
+	struct delayed_work		panel_check_work;
 	struct delayed_work		workaround_18w_work;
 #endif
 };
@@ -910,6 +912,18 @@ static int write_property_work_event(struct battery_chg_dev *bcdev, u32 event)
 	return rc;
 }
 
+static void panel_check_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct battery_chg_dev *bcdev = container_of(dwork,
+						     struct battery_chg_dev,
+						     panel_check_work);
+
+	write_property_work_event(bcdev, WORK_PANEL_CHECK);
+
+	schedule_delayed_work(&bcdev->panel_check_work, 10 * HZ);
+}
+
 static void workaround_18w_worker(struct work_struct *work)
 {
 	struct delayed_work *dwork = to_delayed_work(work);
@@ -1134,6 +1148,8 @@ static int usb_psy_set_icl(struct battery_chg_dev *bcdev, u32 prop_id, int val)
 }
 
 #ifdef CONFIG_MACH_ASUS
+extern bool g_Charger_mode;
+
 static void handle_charging_status(struct battery_chg_dev *bcdev, bool status)
 {
 	if (bcdev->usb_online == status)
@@ -1142,12 +1158,18 @@ static void handle_charging_status(struct battery_chg_dev *bcdev, bool status)
 	bcdev->usb_online = status;
 
 	if (status) {
+		if (!g_Charger_mode) {
+			cancel_delayed_work_sync(&bcdev->panel_check_work);
+			schedule_delayed_work(&bcdev->panel_check_work, 62 * HZ);
+		}
+
 		cancel_delayed_work_sync(&bcdev->workaround_18w_work);
 		schedule_delayed_work(&bcdev->workaround_18w_work, 26 * HZ);
 
 		cancel_delayed_work_sync(&bcdev->thermal_policy_work);
 		schedule_delayed_work(&bcdev->thermal_policy_work, 68 * HZ);
 	} else {
+		cancel_delayed_work_sync(&bcdev->panel_check_work);
 		cancel_delayed_work_sync(&bcdev->workaround_18w_work);
 		cancel_delayed_work_sync(&bcdev->thermal_policy_work);
 	}
@@ -2295,6 +2317,7 @@ static int battery_chg_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&bcdev->usb_thermal_work, usb_thermal_worker);
 	schedule_delayed_work(&bcdev->usb_thermal_work, 0);
 
+	INIT_DELAYED_WORK(&bcdev->panel_check_work, panel_check_worker);
 	INIT_DELAYED_WORK(&bcdev->workaround_18w_work, workaround_18w_worker);
 	INIT_DELAYED_WORK(&bcdev->thermal_policy_work, thermal_policy_worker);
 #endif
