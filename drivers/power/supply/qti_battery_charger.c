@@ -57,6 +57,8 @@
 #define MSG_OWNER_OEM			32782
 
 #define OEM_WORK_EVENT			16
+#define WORK_JEITA_PRECHG		1
+#define WORK_JEITA_CC			2
 #define WORK_PANEL_CHECK		3
 #define WORK_18W_WORKAROUND		5
 
@@ -73,6 +75,7 @@
 
 #define OEM_SET_OTG_WA			0x2107
 #define OEM_USB_PRESENT			0x2108
+#define OEM_WORK_EVENT_REQ		0x2110
 #endif
 
 enum psy_type {
@@ -243,6 +246,13 @@ struct oem_enable_change_msg {
 	struct pmic_glink_hdr hdr;
 	u32 enable;
 };
+
+struct oem_notify_work_event_msg {
+	struct pmic_glink_hdr hdr;
+	u32 work;
+	u32 data_buffer[OEM_PROPERTY_MAX_DATA_SIZE];
+	u32 data_size;
+};
 #endif
 
 struct psy_state {
@@ -301,6 +311,8 @@ struct battery_chg_dev {
 	struct delayed_work		thermal_policy_work;
 	struct delayed_work		panel_check_work;
 	struct delayed_work		workaround_18w_work;
+	struct delayed_work		jeita_prechg_work;
+	struct delayed_work		jeita_cc_work;
 #endif
 };
 
@@ -935,6 +947,30 @@ static void workaround_18w_worker(struct work_struct *work)
 	write_property_work_event(bcdev, WORK_18W_WORKAROUND);
 }
 
+static void jeita_prechg_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct battery_chg_dev *bcdev = container_of(dwork,
+						     struct battery_chg_dev,
+						     jeita_prechg_work);
+
+	write_property_work_event(bcdev, WORK_JEITA_PRECHG);
+
+	schedule_delayed_work(&bcdev->jeita_prechg_work, HZ);
+}
+
+static void jeita_cc_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct battery_chg_dev *bcdev = container_of(dwork,
+						     struct battery_chg_dev,
+						     jeita_cc_work);
+
+	write_property_work_event(bcdev, WORK_JEITA_CC);
+
+	schedule_delayed_work(&bcdev->jeita_cc_work, 5 * HZ);
+}
+
 #define CHECK_LENGTH(msg)						\
 	if (len != sizeof(*msg)) {					\
 		pr_err("Bad response length %zu for opcode %u\n",	\
@@ -945,6 +981,7 @@ static void workaround_18w_worker(struct work_struct *work)
 static void handle_notification_oem(struct battery_chg_dev *bcdev, void *data,
 				    size_t len)
 {
+	struct oem_notify_work_event_msg *work_event_msg;
 	struct oem_enable_change_msg *enable_change_msg;
 	struct pmic_glink_hdr *hdr = data;
 
@@ -960,6 +997,33 @@ static void handle_notification_oem(struct battery_chg_dev *bcdev, void *data,
 
 		enable_change_msg = data;
 		bcdev->usb_present = enable_change_msg->enable;
+		break;
+	case OEM_WORK_EVENT_REQ:
+		CHECK_LENGTH(work_event_msg);
+
+		work_event_msg = data;
+
+		if (work_event_msg->work == WORK_JEITA_PRECHG) {
+			if (work_event_msg->data_buffer[0] == 1) {
+				cancel_delayed_work_sync(
+					&bcdev->jeita_prechg_work);
+				schedule_delayed_work(
+					&bcdev->jeita_prechg_work, 0);
+			} else {
+				cancel_delayed_work_sync(
+					&bcdev->jeita_prechg_work);
+			}
+		} else if (work_event_msg->work == WORK_JEITA_CC) {
+			if (work_event_msg->data_buffer[0] == 1) {
+				cancel_delayed_work_sync(
+					&bcdev->jeita_cc_work);
+				schedule_delayed_work(
+					&bcdev->jeita_cc_work, 5 * HZ);
+			} else {
+				cancel_delayed_work_sync(
+					&bcdev->jeita_cc_work);
+			}
+		}
 		break;
 	default:
 		pr_err("Unknown opcode: %u\n", hdr->opcode);
@@ -1172,6 +1236,8 @@ static void handle_charging_status(struct battery_chg_dev *bcdev, bool status)
 
 		__pm_wakeup_event(bcdev->slowchg_ws, 60 * 1000);
 	} else {
+		cancel_delayed_work_sync(&bcdev->jeita_prechg_work);
+		cancel_delayed_work_sync(&bcdev->jeita_cc_work);
 		cancel_delayed_work_sync(&bcdev->panel_check_work);
 		cancel_delayed_work_sync(&bcdev->workaround_18w_work);
 		cancel_delayed_work_sync(&bcdev->thermal_policy_work);
@@ -2328,6 +2394,8 @@ static int battery_chg_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&bcdev->panel_check_work, panel_check_worker);
 	INIT_DELAYED_WORK(&bcdev->workaround_18w_work, workaround_18w_worker);
 	INIT_DELAYED_WORK(&bcdev->thermal_policy_work, thermal_policy_worker);
+	INIT_DELAYED_WORK(&bcdev->jeita_prechg_work, jeita_prechg_worker);
+	INIT_DELAYED_WORK(&bcdev->jeita_cc_work, jeita_cc_worker);
 #endif
 
 	bcdev->restrict_fcc_ua = DEFAULT_RESTRICT_FCC_UA;
