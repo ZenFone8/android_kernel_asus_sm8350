@@ -76,6 +76,7 @@
 #define OEM_SET_OTG_WA			0x2107
 #define OEM_USB_PRESENT			0x2108
 #define OEM_WORK_EVENT_REQ		0x2110
+#define OEM_JEITA_CC_STATE_REQ		0x2112
 #endif
 
 enum psy_type {
@@ -253,6 +254,11 @@ struct oem_notify_work_event_msg {
 	u32 data_buffer[OEM_PROPERTY_MAX_DATA_SIZE];
 	u32 data_size;
 };
+
+struct oem_jeita_cc_state_msg {
+	struct pmic_glink_hdr hdr;
+	u32 state;
+};
 #endif
 
 struct psy_state {
@@ -313,6 +319,7 @@ struct battery_chg_dev {
 	struct delayed_work		workaround_18w_work;
 	struct delayed_work		jeita_prechg_work;
 	struct delayed_work		jeita_cc_work;
+	int				jeita_cc_state;
 #endif
 };
 
@@ -982,6 +989,7 @@ static void handle_notification_oem(struct battery_chg_dev *bcdev, void *data,
 				    size_t len)
 {
 	struct oem_notify_work_event_msg *work_event_msg;
+	struct oem_jeita_cc_state_msg *jeita_cc_state_msg;
 	struct oem_enable_change_msg *enable_change_msg;
 	struct pmic_glink_hdr *hdr = data;
 
@@ -1024,6 +1032,11 @@ static void handle_notification_oem(struct battery_chg_dev *bcdev, void *data,
 					&bcdev->jeita_cc_work);
 			}
 		}
+		break;
+	case OEM_JEITA_CC_STATE_REQ:
+		CHECK_LENGTH(jeita_cc_state_msg);
+
+		bcdev->jeita_cc_state = jeita_cc_state_msg->state;
 		break;
 	default:
 		pr_err("Unknown opcode: %u\n", hdr->opcode);
