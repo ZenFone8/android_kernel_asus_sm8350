@@ -283,6 +283,7 @@ struct battery_chg_dev {
 	bool				initialized;
 
 #ifdef CONFIG_MACH_ASUS
+	struct class			asuslib_class;
 	struct pmic_glink_client	*client_oem;
 	struct gpio_desc		*otg_switch;
 	bool				usb_present;
@@ -1971,6 +1972,13 @@ static struct attribute *battery_class_attrs[] = {
 };
 ATTRIBUTE_GROUPS(battery_class);
 
+#ifdef CONFIG_MACH_ASUS
+static struct attribute *asuslib_class_attrs[] = {
+	NULL,
+};
+ATTRIBUTE_GROUPS(asuslib_class);
+#endif
+
 #ifdef CONFIG_DEBUG_FS
 static void battery_chg_add_debugfs(struct battery_chg_dev *bcdev)
 {
@@ -2229,6 +2237,16 @@ static int battery_chg_probe(struct platform_device *pdev)
 		dev_err(dev, "Failed to create battery_class rc=%d\n", rc);
 		goto error;
 	}
+
+#ifdef CONFIG_MACH_ASUS
+	bcdev->asuslib_class.name = "asuslib";
+	bcdev->asuslib_class.class_groups = asuslib_class_groups;
+	rc = class_register(&bcdev->asuslib_class);
+	if (rc < 0) {
+		dev_err(dev, "Failed to create asuslib_class rc=%d\n", rc);
+		goto error;
+	}
+#endif
 
 	battery_chg_add_debugfs(bcdev);
 	battery_chg_notify_enable(bcdev);
