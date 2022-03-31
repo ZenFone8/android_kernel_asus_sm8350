@@ -290,6 +290,7 @@ struct battery_chg_dev {
 	bool				usb_online;
 	struct iio_channel		*temp_chan;
 	struct delayed_work		usb_thermal_work;
+	int				thermal_threshold;
 #endif
 };
 
@@ -1973,7 +1974,22 @@ static struct attribute *battery_class_attrs[] = {
 ATTRIBUTE_GROUPS(battery_class);
 
 #ifdef CONFIG_MACH_ASUS
+static ssize_t set_virtualthermal_store(struct class *c,
+					struct class_attribute *attr,
+					const char *buf, size_t count)
+{
+	struct battery_chg_dev *bcdev = container_of(c, struct battery_chg_dev,
+						     battery_class);
+
+	if (kstrtoint(buf, 0, &bcdev->thermal_threshold))
+		return -EINVAL;
+
+	return count;
+}
+static CLASS_ATTR_WO(set_virtualthermal);
+
 static struct attribute *asuslib_class_attrs[] = {
+	&class_attr_set_virtualthermal.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(asuslib_class);
