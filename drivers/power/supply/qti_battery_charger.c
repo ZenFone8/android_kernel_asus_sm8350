@@ -61,6 +61,8 @@
 #define THERMAL_ALERT_NO_AC		1
 #define THERMAL_ALERT_WITH_AC		2
 
+#define OEM_THERMAL_THRESHOLD		23
+
 #define OEM_OPCODE_WRITE_BUFFER		0x10001
 
 #define OEM_PROPERTY_MAX_DATA_SIZE	16
@@ -291,6 +293,7 @@ struct battery_chg_dev {
 	struct iio_channel		*temp_chan;
 	struct delayed_work		usb_thermal_work;
 	int				thermal_threshold;
+	struct delayed_work		thermal_policy_work;
 #endif
 };
 
@@ -872,6 +875,24 @@ out:
 			      msecs_to_jiffies(USB_THERMAL_WORK_MSECS));
 }
 
+static void thermal_policy_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct battery_chg_dev *bcdev = container_of(dwork,
+						     struct battery_chg_dev,
+						     thermal_policy_work);
+	u32 tmp = bcdev->thermal_threshold;
+	int rc;
+
+	rc = write_property_id_oem(bcdev, OEM_THERMAL_THRESHOLD, &tmp, 1);
+	if (rc)
+		dev_err(bcdev->dev,
+			"Failed to write thermal threshold %u, rc=%d\n",
+			tmp, rc);
+
+	schedule_delayed_work(&bcdev->thermal_policy_work, 10 * HZ);
+}
+
 #define CHECK_LENGTH(msg)						\
 	if (len != sizeof(*msg)) {					\
 		pr_err("Bad response length %zu for opcode %u\n",	\
@@ -919,6 +940,7 @@ static void handle_message_oem(struct battery_chg_dev *bcdev, void *data,
 
 		switch (resp_msg->oem_property_id) {
 		case OEM_THERMAL_ALERT_SET:
+		case OEM_THERMAL_THRESHOLD:
 			ack_set = true;
 			break;
 		default:
@@ -1092,7 +1114,10 @@ static void handle_charging_status(struct battery_chg_dev *bcdev, bool status)
 	bcdev->usb_online = status;
 
 	if (status) {
+		cancel_delayed_work_sync(&bcdev->thermal_policy_work);
+		schedule_delayed_work(&bcdev->thermal_policy_work, 68 * HZ);
 	} else {
+		cancel_delayed_work_sync(&bcdev->thermal_policy_work);
 	}
 }
 #endif
@@ -2237,6 +2262,8 @@ static int battery_chg_probe(struct platform_device *pdev)
 #ifdef CONFIG_MACH_ASUS
 	INIT_DELAYED_WORK(&bcdev->usb_thermal_work, usb_thermal_worker);
 	schedule_delayed_work(&bcdev->usb_thermal_work, 0);
+
+	INIT_DELAYED_WORK(&bcdev->thermal_policy_work, thermal_policy_worker);
 #endif
 
 	bcdev->restrict_fcc_ua = DEFAULT_RESTRICT_FCC_UA;
