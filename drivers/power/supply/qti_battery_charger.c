@@ -21,6 +21,7 @@
 #include <linux/power_supply.h>
 #include <linux/soc/qcom/pmic_glink.h>
 #include <linux/soc/qcom/battery_charger.h>
+#include <drm/drm_panel.h>
 
 #define MSG_OWNER_BC			32778
 #define MSG_TYPE_REQ_RESP		1
@@ -55,6 +56,8 @@
 
 #ifdef CONFIG_MACH_ASUS
 #define MSG_OWNER_OEM			32782
+
+#define OEM_PANEL_CHECK			15
 
 #define OEM_WORK_EVENT			16
 #define WORK_JEITA_RULE			0
@@ -315,6 +318,10 @@ struct battery_chg_dev {
 	struct class			asuslib_class;
 	struct pmic_glink_client	*client_oem;
 	struct wakeup_source		*slowchg_ws;
+	struct drm_panel		*panel;
+	struct notifier_block		drm_notif;
+	bool				panel_on;
+	struct delayed_work		panel_state_work;
 	struct gpio_desc		*otg_switch;
 	bool				usb_present;
 	bool				usb_online;
@@ -950,6 +957,23 @@ static void charger_mode_worker(struct work_struct *work)
 	schedule_delayed_work(&bcdev->thermal_policy_work, 10 * HZ);
 }
 
+
+static void panel_state_worker(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct battery_chg_dev *bcdev = container_of(dwork,
+						     struct battery_chg_dev,
+						     panel_state_work);
+
+	u32 tmp = bcdev->panel_on;
+	int rc;
+
+	rc = write_property_id_oem(bcdev, OEM_PANEL_CHECK, &tmp, 1);
+	if (rc)
+		dev_err(bcdev->dev, "Failed to write panel check %u, rc=%d\n",
+			tmp, rc);
+}
+
 static int write_property_work_event(struct battery_chg_dev *bcdev, u32 event)
 {
 	int rc;
@@ -1037,6 +1061,30 @@ static void full_cap_monitor_worker(struct work_struct *work)
 	schedule_delayed_work(&bcdev->full_cap_monitor_work, 30 * HZ);
 }
 
+static int drm_notifier_callback(struct notifier_block *self,
+				 unsigned long event, void *data)
+{
+	struct battery_chg_dev *bcdev =
+		container_of(self, struct battery_chg_dev, drm_notif);
+	struct drm_panel_notifier *evdata = data;
+	int *blank = evdata->data;
+
+	if (!evdata)
+		return 0;
+
+	if (event == DRM_PANEL_EVENT_BLANK) {
+		if (*blank == DRM_PANEL_BLANK_UNBLANK) {
+			bcdev->panel_on = true;
+			schedule_delayed_work(&bcdev->panel_state_work, 0);
+		} else if (*blank == DRM_PANEL_BLANK_POWERDOWN) {
+			bcdev->panel_on = false;
+			schedule_delayed_work(&bcdev->panel_state_work, 0);
+		}
+	}
+
+	return 0;
+}
+
 #define CHECK_LENGTH(msg)						\
 	if (len != sizeof(*msg)) {					\
 		pr_err("Bad response length %zu for opcode %u\n",	\
@@ -1121,6 +1169,7 @@ static void handle_message_oem(struct battery_chg_dev *bcdev, void *data,
 		case OEM_THERMAL_THRESHOLD:
 		case OEM_WORK_EVENT:
 		case OEM_CHG_MODE:
+		case OEM_PANEL_CHECK:
 			ack_set = true;
 			break;
 		default:
@@ -2256,8 +2305,10 @@ static int battery_chg_parse_dt(struct battery_chg_dev *bcdev)
 {
 	struct device_node *node = bcdev->dev->of_node;
 	struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_BATTERY];
+	struct device_node *panel_node;
 	int i, rc, len;
 	u32 prev, val;
+	int count;
 
 	of_property_read_string(node, "qcom,wireless-fw-name",
 				&bcdev->wls_fw_name);
@@ -2330,6 +2381,22 @@ static int battery_chg_parse_dt(struct battery_chg_dev *bcdev)
 		rc = PTR_ERR(bcdev->temp_chan);
 		pr_err("Failed to get temp channel, rc=%d\n", rc);
 		return rc;
+	}
+
+	count = of_count_phandle_with_args(node, "panel", NULL);
+	for (i = 0; i < count; i++) {
+		panel_node = of_parse_phandle(node, "panel", i);
+		bcdev->panel = of_drm_find_panel(panel_node);
+		of_node_put(panel_node);
+		if (!IS_ERR(bcdev->panel))
+			break;
+
+		bcdev->panel = NULL;
+	}
+
+	if (!bcdev->panel) {
+		pr_err("Failed to get panel\n");
+		return -EINVAL;
 	}
 #endif
 
@@ -2465,6 +2532,10 @@ static int battery_chg_probe(struct platform_device *pdev)
 	}
 
 #ifdef CONFIG_MACH_ASUS
+	bcdev->drm_notif.notifier_call = drm_notifier_callback;
+	drm_panel_notifier_register(bcdev->panel, &bcdev->drm_notif);
+	INIT_DELAYED_WORK(&bcdev->panel_state_work, panel_state_worker);
+
 	INIT_DELAYED_WORK(&bcdev->usb_thermal_work, usb_thermal_worker);
 	schedule_delayed_work(&bcdev->usb_thermal_work, 0);
 
