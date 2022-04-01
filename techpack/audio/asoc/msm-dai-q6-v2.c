@@ -48,6 +48,11 @@
 				    SNDRV_PCM_FMTBIT_S24_LE | \
 				    SNDRV_PCM_FMTBIT_S32_LE)
 
+#if defined ASUS_VODKA_PROJECT/* mei +++ for vodka tfa9874 */
+#define AFE_PORT_ID_TFADSP_RX                                  (AFE_PORT_ID_PRIMARY_MI2S_RX)
+#define AFE_PORT_ID_TFADSP_TX                                  (AFE_PORT_ID_PRIMARY_MI2S_TX)
+#endif
+
 static int msm_mi2s_get_port_id(u32 mi2s_id, int stream, u16 *port_id);
 
 enum {
@@ -6083,6 +6088,15 @@ static int msm_dai_q6_mi2s_hw_params(struct snd_pcm_substream *substream,
 		&mi2s_dai_data->mi2s_dai;
 	struct msm_dai_q6_dai_data *dai_data = &mi2s_dai_config->mi2s_dai_data;
 	struct afe_param_id_i2s_cfg *i2s = &dai_data->port_config.i2s;
+	
+#if defined ASUS_VODKA_PROJECT/* mei +++ for vodka tfa9874 */
+	u16 port_id = 0;
+	if (msm_mi2s_get_port_id(dai->id, substream->stream,
+		&port_id) != 0) {
+		dev_err(dai->dev, "%s: Invalid Port ID 0x%x\n",
+			__func__, port_id);
+	}
+#endif
 
 	dai_data->channels = params_channels(params);
 	switch (dai_data->channels) {
@@ -6251,6 +6265,12 @@ static int msm_dai_q6_mi2s_hw_params(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_FORMAT_S24_3LE:
 		dai_data->port_config.i2s.bit_width = 24;
 		dai_data->bitwidth = 24;
+#if defined ASUS_VODKA_PROJECT/* mei +++ for vodka tfa9874 */
+		if (AFE_PORT_ID_TFADSP_TX == port_id) {
+			dai_data->port_config.i2s.bit_width = 32;
+			dai_data->bitwidth = 32;
+		}
+#endif
 		break;
 	case SNDRV_PCM_FORMAT_S32_LE:
 		dai_data->port_config.i2s.bit_width = 32;
@@ -6265,7 +6285,7 @@ static int msm_dai_q6_mi2s_hw_params(struct snd_pcm_substream *substream,
 	dai_data->port_config.i2s.i2s_cfg_minor_version =
 			AFE_API_VERSION_I2S_CONFIG;
 	dai_data->port_config.i2s.sample_rate = dai_data->rate;
-
+	
 	dev_dbg(dai->dev, "%s: dai id %d dai_data->channels = %d\n"
 		"sample_rate = %u i2s_cfg_minor_version = 0x%x\n"
 		"bit_width = %hu  channel_mode = 0x%x mono_stereo = %#x\n"

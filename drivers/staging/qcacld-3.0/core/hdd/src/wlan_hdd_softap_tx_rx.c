@@ -43,7 +43,6 @@
 #include <wlan_hdd_regulatory.h>
 #include "wlan_ipa_ucfg_api.h"
 #include "wlan_policy_mgr_ucfg.h"
-#include "wlan_mlme_twt_ucfg_api.h"
 #include <wma_types.h>
 #include "wlan_hdd_sta_info.h"
 #include "ol_defines.h"
@@ -1405,8 +1404,6 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 				   WLAN_START_ALL_NETIF_QUEUE_N_CARRIER,
 				   WLAN_CONTROL_PATH);
 	ucfg_mlme_update_oce_flags(hdd_ctx->pdev);
-	ucfg_mlme_init_twt_context(hdd_ctx->psoc, sta_mac,
-				   WLAN_ALL_SESSIONS_DIALOG_ID);
 	return qdf_status;
 }
 
@@ -1484,13 +1481,6 @@ QDF_STATUS hdd_softap_stop_bss(struct hdd_adapter *adapter)
 		    QDF_STATUS_SUCCESS)
 			hdd_err("WLAN_AP_DISCONNECT event failed");
 	}
-
-	/* Setting the RTS profile to original value */
-	if (sme_cli_set_command(adapter->vdev_id, WMI_VDEV_PARAM_ENABLE_RTSCTS,
-				cfg_get(hdd_ctx->psoc,
-					CFG_ENABLE_FW_RTS_PROFILE),
-				VDEV_CMD))
-		hdd_debug("Failed to set RTS_PROFILE");
 
 	return status;
 }

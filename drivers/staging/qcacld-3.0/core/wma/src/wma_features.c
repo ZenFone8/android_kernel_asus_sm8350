@@ -78,12 +78,6 @@
  */
 #define WMA_SET_VDEV_IE_SOURCE_HOST 0x0
 
-/*
- * Max AMPDU Tx Aggr supported size
- */
-#define ADDBA_TXAGGR_SIZE_HELIUM 64
-#define ADDBA_TXAGGR_SIZE_LITHIUM 256
-
 static bool is_wakeup_event_console_logs_enabled;
 
 void wma_set_wakeup_logs_to_console(bool value)
@@ -1492,8 +1486,6 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 		return "VDEV_DISCONNECT";
 	case WOW_REASON_LOCAL_DATA_UC_DROP:
 		return "LOCAL_DATA_UC_DROP";
-	case WOW_REASON_FATAL_EVENT_WAKE:
-		return "FATAL_EVENT_WAKE";
 	case WOW_REASON_GENERIC_WAKE:
 		return "GENERIC_WAKE";
 	case WOW_REASON_TWT:
@@ -1527,7 +1519,6 @@ static bool wma_wow_reason_has_stats(enum wake_reason_e reason)
 	case WOW_REASON_CHIP_POWER_FAILURE_DETECT:
 	case WOW_REASON_11D_SCAN:
 	case WOW_REASON_LOCAL_DATA_UC_DROP:
-	case WOW_REASON_FATAL_EVENT_WAKE:
 		return true;
 #ifdef WLAN_FEATURE_MOTION_DETECTION
 	case WOW_REASON_WLAN_MD:
@@ -1578,8 +1569,7 @@ static void wma_wow_stats_display(struct wake_lock_stats *stats)
 
 	wma_conditional_log(is_wakeup_event_console_logs_enabled,
 			    "pno_match:%d pno_complete:%d gscan:%d low_rssi:%d"
-			    " rssi_breach:%d oem:%d ucdrop:%d scan_11d:%d"
-			    " fatal_event:%d",
+			    " rssi_breach:%d oem:%d ucdrop:%d scan_11d:%d",
 			    stats->pno_match_wake_up_count,
 			    stats->pno_complete_wake_up_count,
 			    stats->gscan_wake_up_count,
@@ -1587,8 +1577,7 @@ static void wma_wow_stats_display(struct wake_lock_stats *stats)
 			    stats->rssi_breach_wake_up_count,
 			    stats->oem_response_wake_up_count,
 			    stats->uc_drop_wake_up_count,
-			    stats->scan_11d,
-			    stats->fatal_event_wake_up_count);
+			    stats->scan_11d);
 }
 
 static void wma_print_wow_stats(t_wma_handle *wma,
@@ -1875,7 +1864,7 @@ wma_wow_get_pkt_proto_subtype(uint8_t *data, uint32_t len)
 	eth_type = *(uint16_t *)(data + QDF_NBUF_TRAC_ETH_TYPE_OFFSET);
 	eth_type = qdf_cpu_to_be16(eth_type);
 
-	wma_debug("Ether Type: 0x%04x", eth_type);
+	wma_info("Ether Type: 0x%04x", eth_type);
 	switch (eth_type) {
 	case QDF_NBUF_TRAC_EAPOL_ETH_TYPE:
 		if (len < WMA_EAPOL_SUBTYPE_GET_MIN_LEN)
@@ -1898,7 +1887,7 @@ wma_wow_get_pkt_proto_subtype(uint8_t *data, uint32_t len)
 		wma_debug("IPV4 Packet");
 
 		proto_type = qdf_nbuf_data_get_ipv4_proto(data);
-		wma_debug("IPV4_proto_type: %u", proto_type);
+		wma_info("IPV4_proto_type: %u", proto_type);
 
 		switch (proto_type) {
 		case QDF_NBUF_TRAC_ICMP_TYPE:
@@ -1913,7 +1902,7 @@ wma_wow_get_pkt_proto_subtype(uint8_t *data, uint32_t len)
 				return QDF_PROTO_IPV4_UDP;
 
 			if (!qdf_nbuf_data_is_ipv4_dhcp_pkt(data))
-				return QDF_PROTO_IPV4_UDP;
+				return QDF_PROTO_INVALID;
 
 			if (len < WMA_DHCP_SUBTYPE_GET_MIN_LEN)
 				return QDF_PROTO_INVALID;
@@ -1935,7 +1924,7 @@ wma_wow_get_pkt_proto_subtype(uint8_t *data, uint32_t len)
 		wma_debug("IPV6 Packet");
 
 		proto_type = qdf_nbuf_data_get_ipv6_proto(data);
-		wma_debug("IPV6_proto_type: %u", proto_type);
+		wma_info("IPV6_proto_type: %u", proto_type);
 
 		switch (proto_type) {
 		case QDF_NBUF_TRAC_ICMPV6_TYPE:
@@ -1969,7 +1958,7 @@ static void wma_log_pkt_eapol(uint8_t *data, uint32_t length)
 
 	pkt_len = *(uint16_t *)(data + EAPOL_PKT_LEN_OFFSET);
 	key_len = *(uint16_t *)(data + EAPOL_KEY_LEN_OFFSET);
-	wma_debug("Pkt_len: %u, Key_len: %u",
+	wma_info("Pkt_len: %u, Key_len: %u",
 		 qdf_cpu_to_be16(pkt_len), qdf_cpu_to_be16(key_len));
 }
 
@@ -1983,7 +1972,7 @@ static void wma_log_pkt_dhcp(uint8_t *data, uint32_t length)
 
 	pkt_len = *(uint16_t *)(data + DHCP_PKT_LEN_OFFSET);
 	trans_id = *(uint32_t *)(data + DHCP_TRANSACTION_ID_OFFSET);
-	wma_debug("Pkt_len: %u, Transaction_id: %u",
+	wma_info("Pkt_len: %u, Transaction_id: %u",
 		 qdf_cpu_to_be16(pkt_len), qdf_cpu_to_be16(trans_id));
 }
 
@@ -1996,7 +1985,7 @@ static void wma_log_pkt_icmpv4(uint8_t *data, uint32_t length)
 
 	pkt_len = *(uint16_t *)(data + IPV4_PKT_LEN_OFFSET);
 	seq_num = *(uint16_t *)(data + ICMP_SEQ_NUM_OFFSET);
-	wma_debug("Pkt_len: %u, Seq_num: %u",
+	wma_info("Pkt_len: %u, Seq_num: %u",
 		 qdf_cpu_to_be16(pkt_len), qdf_cpu_to_be16(seq_num));
 }
 
@@ -2009,7 +1998,7 @@ static void wma_log_pkt_icmpv6(uint8_t *data, uint32_t length)
 
 	pkt_len = *(uint16_t *)(data + IPV6_PKT_LEN_OFFSET);
 	seq_num = *(uint16_t *)(data + ICMPV6_SEQ_NUM_OFFSET);
-	wma_debug("Pkt_len: %u, Seq_num: %u",
+	wma_info("Pkt_len: %u, Seq_num: %u",
 		 qdf_cpu_to_be16(pkt_len), qdf_cpu_to_be16(seq_num));
 }
 
@@ -2023,10 +2012,10 @@ static void wma_log_pkt_ipv4(uint8_t *data, uint32_t length)
 
 	pkt_len = *(uint16_t *)(data + IPV4_PKT_LEN_OFFSET);
 	ip_addr = (char *)(data + IPV4_SRC_ADDR_OFFSET);
-	wma_nofl_debug("src addr %d:%d:%d:%d", ip_addr[0], ip_addr[1],
+	wma_info("src addr %d:%d:%d:%d", ip_addr[0], ip_addr[1],
 		      ip_addr[2], ip_addr[3]);
 	ip_addr = (char *)(data + IPV4_DST_ADDR_OFFSET);
-	wma_nofl_debug("dst addr %d:%d:%d:%d", ip_addr[0], ip_addr[1],
+	wma_info("dst addr %d:%d:%d:%d", ip_addr[0], ip_addr[1],
 		      ip_addr[2], ip_addr[3]);
 	src_port = *(uint16_t *)(data + IPV4_SRC_PORT_OFFSET);
 	dst_port = *(uint16_t *)(data + IPV4_DST_PORT_OFFSET);
@@ -2046,14 +2035,14 @@ static void wma_log_pkt_ipv6(uint8_t *data, uint32_t length)
 
 	pkt_len = *(uint16_t *)(data + IPV6_PKT_LEN_OFFSET);
 	ip_addr = (char *)(data + IPV6_SRC_ADDR_OFFSET);
-	wma_nofl_debug("src addr "IPV6_ADDR_STR, ip_addr[0],
+	wma_info("src addr "IPV6_ADDR_STR, ip_addr[0],
 		 ip_addr[1], ip_addr[2], ip_addr[3], ip_addr[4],
 		 ip_addr[5], ip_addr[6], ip_addr[7], ip_addr[8],
 		 ip_addr[9], ip_addr[10], ip_addr[11],
 		 ip_addr[12], ip_addr[13], ip_addr[14],
 		 ip_addr[15]);
 	ip_addr = (char *)(data + IPV6_DST_ADDR_OFFSET);
-	wma_nofl_debug("dst addr "IPV6_ADDR_STR, ip_addr[0],
+	wma_info("dst addr "IPV6_ADDR_STR, ip_addr[0],
 		 ip_addr[1], ip_addr[2], ip_addr[3], ip_addr[4],
 		 ip_addr[5], ip_addr[6], ip_addr[7], ip_addr[8],
 		 ip_addr[9], ip_addr[10], ip_addr[11],
@@ -2075,7 +2064,7 @@ static void wma_log_pkt_tcpv4(uint8_t *data, uint32_t length)
 		return;
 
 	seq_num = *(uint32_t *)(data + IPV4_TCP_SEQ_NUM_OFFSET);
-	wma_debug("TCP_seq_num: %u", qdf_cpu_to_be16(seq_num));
+	wma_info("TCP_seq_num: %u", qdf_cpu_to_be16(seq_num));
 }
 
 static void wma_log_pkt_tcpv6(uint8_t *data, uint32_t length)
@@ -2086,7 +2075,7 @@ static void wma_log_pkt_tcpv6(uint8_t *data, uint32_t length)
 		return;
 
 	seq_num = *(uint32_t *)(data + IPV6_TCP_SEQ_NUM_OFFSET);
-	wma_debug("TCP_seq_num: %u", qdf_cpu_to_be16(seq_num));
+	wma_info("TCP_seq_num: %u", qdf_cpu_to_be16(seq_num));
 }
 
 static void wma_wow_inc_wake_lock_stats_by_dst_addr(t_wma_handle *wma,
@@ -4029,26 +4018,14 @@ QDF_STATUS wma_set_tx_rx_aggr_size(uint8_t vdev_id,
 		WMITLV_GET_STRUCT_TLVLEN(
 			wmi_vdev_set_custom_aggr_size_cmd_fixed_param));
 
-	if (wmi_service_enabled(wma_handle->wmi_handle,
-				wmi_service_ampdu_tx_buf_size_256_support)) {
-		cmd->enable_bitmap |= (0x1 << 6);
-		if (!(tx_size <= ADDBA_TXAGGR_SIZE_LITHIUM)) {
-			wma_err("Invalid AMPDU Size");
-			return QDF_STATUS_E_INVAL;
-		}
-	} else if (tx_size == ADDBA_TXAGGR_SIZE_LITHIUM) {
-		tx_size = ADDBA_TXAGGR_SIZE_HELIUM;
-	} else if (!(tx_size <= ADDBA_TXAGGR_SIZE_HELIUM)) {
-		wma_err("Invalid AMPDU Size");
-		return QDF_STATUS_E_INVAL;
-	}
-
 	cmd->vdev_id = vdev_id;
 	cmd->tx_aggr_size = tx_size;
 	cmd->rx_aggr_size = rx_size;
 	/* bit 2 (aggr_type): TX Aggregation Type (0=A-MPDU, 1=A-MSDU) */
 	if (aggr_type == WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU)
 		cmd->enable_bitmap |= 0x04;
+
+	cmd->enable_bitmap |= (0x1 << 6);
 
 	wma_debug("tx aggr: %d rx aggr: %d vdev: %d enable_bitmap %d",
 		 cmd->tx_aggr_size, cmd->rx_aggr_size, cmd->vdev_id,
@@ -4109,26 +4086,13 @@ QDF_STATUS wma_set_tx_rx_aggr_size_per_ac(WMA_HANDLE handle,
 		cmd->vdev_id = vdev_id;
 		cmd->rx_aggr_size = qos_aggr->rx_aggregation_size;
 		cmd->tx_aggr_size = tx_aggr_size[queue_num];
-
-		if (wmi_service_enabled(wma_handle->wmi_handle,
-					wmi_service_ampdu_tx_buf_size_256_support)) {
-			cmd->enable_bitmap |= (0x1 << 6);
-			if (!(tx_aggr_size[queue_num] <= ADDBA_TXAGGR_SIZE_LITHIUM)) {
-				wma_err("Invalid AMPDU Size");
-				return QDF_STATUS_E_INVAL;
-			}
-		} else if (tx_aggr_size[queue_num] == ADDBA_TXAGGR_SIZE_LITHIUM) {
-			tx_aggr_size[queue_num] = ADDBA_TXAGGR_SIZE_HELIUM;
-		} else if (!(tx_aggr_size[queue_num] <= ADDBA_TXAGGR_SIZE_HELIUM)) {
-			wma_err("Invalid AMPDU Size");
-			return QDF_STATUS_E_INVAL;
-		}
-
 		/* bit 5: tx_ac_enable, if set, ac bitmap is valid. */
-		cmd->enable_bitmap |= 0x20 | queue_num;
+		cmd->enable_bitmap = 0x20 | queue_num;
 		/* bit 2 (aggr_type): TX Aggregation Type (0=A-MPDU, 1=A-MSDU) */
 		if (aggr_type == WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU)
 			cmd->enable_bitmap |= 0x04;
+
+		cmd->enable_bitmap |= (0x1 << 6);
 
 		wma_debug("queue_num: %d, tx aggr: %d rx aggr: %d vdev: %d, bitmap: %d",
 			 queue_num, cmd->tx_aggr_size,
@@ -4188,35 +4152,6 @@ static QDF_STATUS wma_set_sw_retry_by_qos(
 	if (ret) {
 		wmi_buf_free(buf);
 		return QDF_STATUS_E_FAILURE;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS wma_set_vdev_sw_retry_th(uint8_t vdev_id, uint8_t sw_retry_count,
-				    wmi_vdev_custom_sw_retry_type_t retry_type)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	tp_wma_handle wma_handle;
-	uint32_t queue_num;
-
-	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle)
-		return QDF_STATUS_E_FAILURE;
-
-
-	for (queue_num = 0; queue_num < WMI_AC_MAX; queue_num++) {
-		if (sw_retry_count == 0)
-			continue;
-
-		status = wma_set_sw_retry_by_qos(wma_handle,
-						 vdev_id,
-						 retry_type,
-						 queue_num,
-						 sw_retry_count);
-
-		if (QDF_IS_STATUS_ERROR(status))
-			return status;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -4610,8 +4545,8 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 
 	param_buf = (wmi_pdev_chip_power_stats_event_fixed_param *)
 		param_tlvs->fixed_param;
-	if (!mac) {
-		wma_debug("NULL mac ptr");
+	if (!mac || !mac->sme.power_stats_resp_callback) {
+		wma_debug("NULL mac ptr or HDD callback is null");
 		return -EINVAL;
 	}
 
@@ -4662,9 +4597,12 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 
 	qdf_mem_copy(power_stats_results->debug_registers,
 			debug_registers, stats_registers_len);
-	if (mac->sme.sme_power_debug_stats_callback)
-		mac->sme.sme_power_debug_stats_callback(mac,
-							power_stats_results);
+
+	mac->sme.power_stats_resp_callback(power_stats_results,
+			mac->sme.power_debug_stats_context);
+
+	mac->sme.power_stats_resp_callback = NULL;
+	mac->sme.power_debug_stats_context = NULL;
 
 	qdf_mem_free(power_stats_results);
 	return 0;

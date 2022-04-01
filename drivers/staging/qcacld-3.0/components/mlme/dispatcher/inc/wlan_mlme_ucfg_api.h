@@ -1767,23 +1767,6 @@ QDF_STATUS ucfg_mlme_get_bigtk_support(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * ucfg_mlme_get_ocv_support() - Get whether ocv is supported or not.
- *
- * @psoc: pointer to psoc object
- * @value: pointer to the value which will be filled for the caller
- *
- * Inline UCFG API to be used by HDD/OSIF callers to get the OCV support
- *
- * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
- */
-static inline
-QDF_STATUS ucfg_mlme_get_ocv_support(struct wlan_objmgr_psoc *psoc,
-				     bool *value)
-{
-	return wlan_mlme_get_ocv_support(psoc, value);
-}
-
-/**
  * ucfg_mlme_get_oce_sap_enabled_info() - Get OCE feature enable/disable
  * info for SAP
  *
@@ -2664,36 +2647,6 @@ ucfg_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 }
 
 /**
- * ucfg_mlme_is_rf_test_mode_enabled() - Get rf test mode flag
- * @psoc: pointer to psoc object
- * @value: Value that needs to be set from the caller
- *
- * Inline UCFG API to be used by HDD/OSIF callers
- *
- * Return: QDF Status
- */
-static inline QDF_STATUS
-ucfg_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
-{
-	return wlan_mlme_is_rf_test_mode_enabled(psoc, value);
-}
-
-/**
- * ucfg_mlme_set_rf_test_mode_enabled() - Set rf test mode flag
- * @psoc: pointer to psoc object
- * @value: Value that needs to be set from the caller
- *
- * Inline UCFG API to be used by HDD/OSIF callers
- *
- * Return: QDF Status
- */
-static inline QDF_STATUS
-ucfg_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
-{
-	return wlan_mlme_set_rf_test_mode_enabled(psoc, value);
-}
-
-/**
  * ucfg_mlme_get_opr_rate() - Get operational rate set
  * @psoc: pointer to vdev object
  * @buf: buffer to get rates set
@@ -3204,34 +3157,6 @@ static inline QDF_STATUS
 ucfg_mlme_get_wmm_mode(struct wlan_objmgr_psoc *psoc, uint8_t *value)
 {
 	return wlan_mlme_get_wmm_mode(psoc, value);
-}
-
-/**
- * ucfg_mlme_cfg_get_wlm_level() - Get the WLM level value
- * @psoc: pointer to psoc object
- * @level: level that needs to be filled.
- *
- * Return: QDF Status
- */
-static inline
-QDF_STATUS ucfg_mlme_cfg_get_wlm_level(struct wlan_objmgr_psoc *psoc,
-				       uint8_t *level)
-{
-	return mlme_get_cfg_wlm_level(psoc, level);
-}
-
-/**
- * ucfg_mlme_cfg_get_wlm_reset() - Get the WLM reset flag
- * @psoc: pointer to psoc object
- * @reset: reset that needs to be filled.
- *
- * Return: QDF Status
- */
-static inline
-QDF_STATUS ucfg_mlme_cfg_get_wlm_reset(struct wlan_objmgr_psoc *psoc,
-				       bool *reset)
-{
-	return mlme_get_cfg_wlm_reset(psoc, reset);
 }
 
 #ifdef WLAN_FEATURE_11AX
@@ -4001,18 +3926,6 @@ ucfg_mlme_set_obss_color_collision_offload_enabled(
 		struct wlan_objmgr_psoc *psoc, uint8_t value);
 
 /**
- * ucfg_mlme_set_bss_color_collision_det_sta() - Enable bss color
- * collision detection offload for STA mode
- * @psoc:   pointer to psoc object
- * @value:  enable or disable
- *
- * Return: QDF Status
- */
-QDF_STATUS
-ucfg_mlme_set_bss_color_collision_det_sta(struct wlan_objmgr_psoc *psoc,
-					  uint8_t value);
-
-/**
  * ucfg_mlme_set_restricted_80p80_bw_supp() - Set the restricted 80p80 support
  * @psoc: pointer to psoc object
  * @restricted_80p80_supp: Value to be set from the caller
@@ -4187,34 +4100,6 @@ ucfg_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
 }
 
 #endif
-
-/**
- * ucfg_mlme_set_user_ps()  - Set the PS user config
- * @psoc: pointer to psoc object
- * @vdev_id: Vdev id
- * @ps_enable: Flag to indicate if user PS is enabled
- *
- * Return: QDF_STATUS
- */
-static inline
-QDF_STATUS ucfg_mlme_set_user_ps(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-				 bool ps_enable)
-{
-	return mlme_set_user_ps(psoc, vdev_id, ps_enable);
-}
-
-/**
- * ucfg_mlme_get_user_ps()  - Get user PS flag
- * @psoc: pointer to psoc object
- * @vdev_id: Vdev id
- *
- * Return: True if user ps is enabled else false
- */
-static inline
-bool ucfg_mlme_get_user_ps(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
-{
-	return mlme_get_user_ps(psoc, vdev_id);
-}
 
 /**
  * ucfg_mlme_is_sta_mon_conc_supported() - Check if STA + Monitor mode

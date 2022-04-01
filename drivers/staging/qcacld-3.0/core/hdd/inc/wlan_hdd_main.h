@@ -237,6 +237,7 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
  * @DEVICE_IFACE_OPENED: Adapter has been "opened" via the kernel
  * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
+ * @DOWN_DURING_SSR: Mark interface is down during SSR
  */
 enum hdd_adapter_flags {
 	NET_DEVICE_REGISTERED,
@@ -247,16 +248,7 @@ enum hdd_adapter_flags {
 	DEVICE_IFACE_OPENED,
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
-};
-
-/**
- * enum hdd_nb_cmd_id - North bound command IDs received during SSR
- * @NO_COMMAND - No NB command received during SSR
- * @INTERFACE_DOWN - Received interface down during SSR
- */
-enum hdd_nb_cmd_id {
-	NO_COMMAND,
-	INTERFACE_DOWN
+	DOWN_DURING_SSR,
 };
 
 #define WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS  1000
@@ -516,7 +508,6 @@ typedef enum {
 	NET_DEV_HOLD_DISPLAY_TXRX_STATS = 58,
 	NET_DEV_HOLD_GET_MODE_SPECIFIC_IF_COUNT = 59,
 	NET_DEV_HOLD_START_PRE_CAC_TRANS = 60,
-	NET_DEV_HOLD_IS_ANY_STA_CONNECTED = 61,
 
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX
@@ -1224,7 +1215,6 @@ struct hdd_context;
  * @delete_in_progress: Flag to indicate that the adapter delete is in
  *			progress, and any operation using rtnl lock inside
  *			the driver can be avoided/skipped.
- * @mon_adapter: hdd_adapter of monitor mode.
  */
 struct hdd_adapter {
 	/* Magic cookie for adapter sanity verification.  Note that this
@@ -1535,14 +1525,8 @@ struct hdd_adapter {
 	enum hdd_work_status netdev_features_update_work_status;
 	/* Flag to indicate whether it is a pre cac adapter or not */
 	bool is_pre_cac_adapter;
-#ifdef WLAN_FEATURE_BIG_DATA_STATS
-	struct big_data_stats_event big_data_stats;
-#endif
 	bool delete_in_progress;
 	qdf_atomic_t net_dev_hold_ref_count[NET_DEV_HOLD_ID_MAX];
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-	struct hdd_adapter *mon_adapter;
-#endif
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
@@ -1863,8 +1847,6 @@ struct hdd_adapter_ops_history {
  * @multi_client_thermal_mitigation: Multi client thermal mitigation by fw
  * @disconnect_for_sta_mon_conc: disconnect if sta monitor intf concurrency
  * @is_dual_mac_cfg_updated: indicate whether dual mac cfg has been updated
- * @twt_en_dis_work: work to send twt enable/disable cmd on MCC/SCC concurrency
- * @dump_in_progress: Stores value of dump in progress
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2142,7 +2124,6 @@ struct hdd_context {
 #ifdef WLAN_SUPPORT_TWT
 	enum twt_status twt_state;
 	qdf_event_t twt_disable_comp_evt;
-	qdf_event_t twt_enable_comp_evt;
 #endif
 #ifdef FEATURE_WLAN_APF
 	uint32_t apf_version;
@@ -2212,14 +2193,6 @@ struct hdd_context {
 	bool is_regulatory_update_in_progress;
 	qdf_event_t regulatory_update_event;
 	qdf_mutex_t regulatory_status_lock;
-	bool is_fw_dbg_log_levels_configured;
-#ifdef WLAN_SUPPORT_TWT
-	qdf_work_t twt_en_dis_work;
-#endif
-	bool dump_in_progress;
-#ifdef THERMAL_STATS_SUPPORT
-	bool is_therm_stats_in_progress;
-#endif
 };
 
 /**
@@ -2888,7 +2861,8 @@ hdd_add_latency_critical_client(struct hdd_adapter *adapter,
 	switch (phymode) {
 	case QCA_WLAN_802_11_MODE_11A:
 	case QCA_WLAN_802_11_MODE_11G:
-		qdf_atomic_inc(&hdd_ctx->num_latency_critical_clients);
+		if (adapter->device_mode == QDF_STA_MODE)
+			qdf_atomic_inc(&hdd_ctx->num_latency_critical_clients);
 
 		hdd_debug("Adding latency critical connection for vdev %d",
 			  adapter->vdev_id);
@@ -2921,7 +2895,8 @@ hdd_del_latency_critical_client(struct hdd_adapter *adapter,
 	switch (phymode) {
 	case QCA_WLAN_802_11_MODE_11A:
 	case QCA_WLAN_802_11_MODE_11G:
-		qdf_atomic_dec(&hdd_ctx->num_latency_critical_clients);
+		if (adapter->device_mode == QDF_STA_MODE)
+			qdf_atomic_dec(&hdd_ctx->num_latency_critical_clients);
 
 		hdd_info("Removing latency critical connection for vdev %d",
 			 adapter->vdev_id);
@@ -4176,14 +4151,6 @@ void hdd_unregister_notifiers(struct hdd_context *hdd_ctx);
 int hdd_dbs_scan_selection_init(struct hdd_context *hdd_ctx);
 
 /**
- * hdd_update_scan_config - API to update scan configuration parameters
- * @hdd_ctx: HDD context
- *
- * Return: 0 if success else err
- */
-int hdd_update_scan_config(struct hdd_context *hdd_ctx);
-
-/**
  * hdd_start_complete()- complete the start event
  * @ret: return value for complete event.
  *
@@ -4723,22 +4690,6 @@ void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
 void
 wlan_hdd_del_p2p_interface(struct hdd_context *hdd_ctx);
 
-/**
- * hdd_reset_monitor_interface() - reset monitor interface flags
- * @sta_adapter: station adapter
- *
- * Return: void
- */
-void hdd_reset_monitor_interface(struct hdd_adapter *sta_adapter);
-
-/**
- * hdd_is_pkt_capture_mon_enable() - Is packet capture monitor mode enable
- * @sta_adapter: station adapter
- *
- * Return: status of packet capture monitor adapter
- */
-struct hdd_adapter *
-hdd_is_pkt_capture_mon_enable(struct hdd_adapter *sta_adapter);
 #else
 static inline
 void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
@@ -4755,15 +4706,6 @@ bool wlan_hdd_is_mon_concurrency(void)
 static inline
 void wlan_hdd_del_p2p_interface(struct hdd_context *hdd_ctx)
 {
-}
-
-static inline void hdd_reset_monitor_interface(struct hdd_adapter *sta_adapter)
-{
-}
-
-static inline int hdd_is_pkt_capture_mon_enable(struct hdd_adapter *adapter)
-{
-	return 0;
 }
 #endif /* WLAN_FEATURE_PKT_CAPTURE */
 /**
@@ -4943,14 +4885,6 @@ static inline unsigned long wlan_hdd_get_pm_qos_cpu_latency(void)
 #endif /* defined(CLD_PM_QOS) || defined(FEATURE_RUNTIME_PM) */
 
 /**
- * hdd_is_runtime_pm_enabled - if runtime pm enabled
- * @hdd_ctx: hdd context
- *
- * Return: true if runtime pm enabled. false if disabled.
- */
-bool hdd_is_runtime_pm_enabled(struct hdd_context *hdd_ctx);
-
-/**
  * hdd_netdev_feature_update - Update the netdev features
  * @net_dev: Handle to net_device
  *
@@ -4959,17 +4893,6 @@ bool hdd_is_runtime_pm_enabled(struct hdd_context *hdd_ctx);
  * Return: None
  */
 void hdd_netdev_update_features(struct hdd_adapter *adapter);
-
-/**
- * hdd_stop_no_trans() - HDD stop function
- * @dev:	Pointer to net_device structure
- *
- * This is called in response to ifconfig down. Vdev sync transaction
- * should be started before calling this API.
- *
- * Return: 0 for success; non-zero for failure
- */
-int hdd_stop_no_trans(struct net_device *dev);
 
 #if defined(CLD_PM_QOS)
 /**

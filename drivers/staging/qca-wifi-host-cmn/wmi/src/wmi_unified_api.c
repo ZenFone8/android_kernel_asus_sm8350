@@ -773,11 +773,13 @@ QDF_STATUS wmi_unified_process_ll_stats_get_cmd(wmi_unified_t wmi_handle,
 #ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
 QDF_STATUS wmi_process_unified_ll_stats_get_sta_cmd(
 				wmi_unified_t wmi_handle,
-				const struct ll_stats_get_params *get_req)
+				const struct ll_stats_get_params *get_req,
+				bool is_always_over_qmi)
 {
 	if (wmi_handle->ops->send_unified_ll_stats_get_sta_cmd)
 		return wmi_handle->ops->send_unified_ll_stats_get_sta_cmd(
-						wmi_handle, get_req);
+						wmi_handle, get_req,
+						is_always_over_qmi);
 
 	return QDF_STATUS_E_FAILURE;
 }
@@ -2225,16 +2227,12 @@ wmi_extract_chan_stats(wmi_unified_t wmi_handle, void *evt_buf,
 }
 
 QDF_STATUS wmi_extract_thermal_stats(wmi_unified_t wmi_handle, void *evt_buf,
-				     uint32_t *temp,
-				     enum thermal_throttle_level *level,
-				     uint32_t *therm_throt_levels,
-				     struct thermal_throt_level_stats *tt_stats,
+				     uint32_t *temp, uint32_t *level,
 				     uint32_t *pdev_id)
 {
 	if (wmi_handle->ops->extract_thermal_stats)
 		return wmi_handle->ops->extract_thermal_stats(wmi_handle,
-			evt_buf, temp, level, therm_throt_levels,
-			tt_stats, pdev_id);
+			evt_buf, temp, level, pdev_id);
 
 	return QDF_STATUS_E_FAILURE;
 }
@@ -3234,20 +3232,6 @@ wmi_unified_extract_vdev_mgmt_offload_event(
 	return QDF_STATUS_E_FAILURE;
 }
 #endif /* WLAN_FEATURE_PKT_CAPTURE */
-
-#ifdef WLAN_FEATURE_PKT_CAPTURE_V2
-QDF_STATUS
-wmi_unified_extract_smart_monitor_event(
-				wmi_unified_t wmi, void *evt_buf,
-				struct smu_event_params *params)
-{
-	if (wmi->ops->extract_smart_monitor_event)
-		return wmi->ops->extract_smart_monitor_event(wmi, evt_buf,
-							     params);
-
-	return QDF_STATUS_E_FAILURE;
-}
-#endif /* WLAN_FEATURE_PKT_CAPTURE_V2 */
 
 QDF_STATUS
 wmi_unified_extract_roam_result_stats(wmi_unified_t wmi, void *buf,

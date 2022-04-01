@@ -616,7 +616,8 @@ int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 		ch_freq = sta_ctx->conn_info.chan_freq;
 	}
 
-	if (!sme_is_channel_valid(hdd_ctx->mac_handle, ch_freq)) {
+	if (QDF_STATUS_SUCCESS !=
+	    wlan_hdd_validate_operation_channel(adapter, ch_freq)) {
 		hdd_err("Invalid Ch freq: %d", ch_freq);
 		ret = -EINVAL;
 		goto exit;
@@ -2336,7 +2337,7 @@ static int hdd_enable_unit_test_commands(struct hdd_adapter *adapter,
 		}
 
 		if (hdd_ctx->target_type == TARGET_TYPE_QCA6490) {
-			arg[0] = 44;
+			arg[0] = 39;
 			arg[1] = 3000;
 
 			status = sme_send_unit_test_cmd(adapter->vdev_id,
@@ -2399,7 +2400,7 @@ static int hdd_disable_unit_test_commands(struct hdd_adapter *adapter,
 		if (status != QDF_STATUS_SUCCESS)
 			return qdf_status_to_os_return(status);
 
-		arg[0] = 44;
+		arg[0] = 39;
 		arg[1] = 0;
 
 		status = sme_send_unit_test_cmd(adapter->vdev_id,
@@ -4594,7 +4595,8 @@ static int drv_cmd_fast_reassoc(struct hdd_adapter *adapter,
 	}
 
 	/* Check freq number is a valid freq number */
-	if (freq && !sme_is_channel_valid(mac_handle, freq)) {
+	if (freq && QDF_STATUS_SUCCESS !=
+		wlan_hdd_validate_operation_channel(adapter, freq)) {
 		hdd_err("Invalid freq [%d]", freq);
 		return -EINVAL;
 	}
@@ -6327,12 +6329,9 @@ static int drv_cmd_set_fcc_channel(struct hdd_adapter *adapter,
 				   struct hdd_priv_data *priv_data)
 {
 	QDF_STATUS status;
-	QDF_STATUS status_6G = QDF_STATUS_SUCCESS;
 	int8_t input_value;
 	bool fcc_constraint;
 	int err;
-	uint32_t band_bitmap = 0;
-	bool rf_test_mode;
 
 	/*
 	 * This command would be called by user-space when it detects WLAN
@@ -6355,28 +6354,9 @@ static int drv_cmd_set_fcc_channel(struct hdd_adapter *adapter,
 
 	status = ucfg_reg_set_fcc_constraint(hdd_ctx->pdev, fcc_constraint);
 
-	status_6G = ucfg_mlme_is_rf_test_mode_enabled(hdd_ctx->psoc,
-						      &rf_test_mode);
-	if (!QDF_IS_STATUS_SUCCESS(status_6G)) {
-		hdd_err("Get rf test mode failed");
-		goto send_status;
-	}
-
-	if (!rf_test_mode) {
-		if (fcc_constraint)
-			band_bitmap |= (BIT(REG_BAND_5G) | BIT(REG_BAND_2G));
-		else
-			band_bitmap = REG_BAND_MASK_ALL;
-		if (hdd_reg_set_band(adapter->dev, band_bitmap))
-			status_6G = QDF_STATUS_E_FAILURE;
-	}
-
-send_status:
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to %s tx power for channels 12/13",
 			fcc_constraint ? "restore" : "reduce");
-	else
-		status = status_6G;
 
 	return qdf_status_to_os_return(status);
 }
@@ -6491,12 +6471,9 @@ static int drv_cmd_set_channel_switch(struct hdd_adapter *adapter,
 
 	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, adapter->vdev_id,
 				    CSA_REASON_USER_INITIATED);
-
-	if (chan_number <= wlan_reg_max_5ghz_ch_num())
-		chan_number = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
-							   chan_number);
-
-	status = hdd_softap_set_channel_change(dev, chan_number, width, true);
+	status = hdd_softap_set_channel_change(dev,
+					       wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev, chan_number),
+					       width, true);
 	if (status) {
 		hdd_err("Set channel change fail");
 		return status;

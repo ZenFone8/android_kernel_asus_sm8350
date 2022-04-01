@@ -122,7 +122,6 @@ hdd_world_regrules_67_68_6A_6C = {
 	}
 };
 
-#define OSIF_PSOC_SYNC_OP_WAIT_TIME 500
 /**
  * hdd_get_world_regrules() - get the appropriate world regrules
  * @reg: regulatory data
@@ -1433,11 +1432,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
 		oper_freq = hdd_get_adapter_home_channel(adapter);
-		if (oper_freq)
-			freq_changed = wlan_reg_is_disable_for_freq(pdev,
-								    oper_freq);
-		else
-			freq_changed = false;
+		freq_changed = wlan_reg_is_disable_for_freq(pdev, oper_freq);
 
 		switch (adapter->device_mode) {
 		case QDF_P2P_CLIENT_MODE:
@@ -1574,11 +1569,6 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 						     adapter->vdev_id);
 			break;
 		case QDF_SAP_MODE:
-			if (!test_bit(SOFTAP_INIT_DONE,
-				      &adapter->event_flags)) {
-				hdd_info("AP is not started yet");
-				break;
-			}
 			sap_config = &adapter->session.ap.sap_config;
 			reg_phy_mode = csr_convert_to_reg_phy_mode(
 						sap_config->sap_orig_hw_mode,
@@ -1616,12 +1606,6 @@ static void __hdd_country_change_work_handle(struct hdd_context *hdd_ctx)
 	hdd_country_change_update_sta(hdd_ctx);
 	sme_generic_change_country_code(hdd_ctx->mac_handle,
 					hdd_ctx->reg.alpha2);
-
-	qdf_event_set(&hdd_ctx->regulatory_update_event);
-	qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
-	hdd_ctx->is_regulatory_update_in_progress = false;
-	qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
-
 	hdd_country_change_update_sap(hdd_ctx);
 }
 
@@ -1645,16 +1629,8 @@ static void hdd_country_change_work_handle(void *arg)
 		return;
 
 	errno = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy), &psoc_sync);
-
-	if (errno == -EAGAIN) {
-		qdf_sleep(OSIF_PSOC_SYNC_OP_WAIT_TIME);
-		hdd_debug("rescheduling country change work");
-		qdf_sched_work(0, &hdd_ctx->country_change_work);
+	if (errno)
 		return;
-	} else if (errno) {
-		hdd_err("can not handle country change %d", errno);
-		return;
-	}
 
 	__hdd_country_change_work_handle(hdd_ctx);
 
@@ -1705,6 +1681,10 @@ static void hdd_regulatory_dyn_cbk(struct wlan_objmgr_psoc *psoc,
 
 	hdd_config_tdls_with_band_switch(hdd_ctx);
 	qdf_sched_work(0, &hdd_ctx->country_change_work);
+	qdf_event_set(&hdd_ctx->regulatory_update_event);
+	qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
+	hdd_ctx->is_regulatory_update_in_progress = false;
+	qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
 }
 
 int hdd_update_regulatory_config(struct hdd_context *hdd_ctx)

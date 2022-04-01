@@ -35,8 +35,6 @@
 
 #define POLICY_MGR_MAX_CON_STRING_LEN   100
 
-static const uint16_t sap_mand_5g_freq_list[] = {5745, 5765, 5785, 5805};
-
 struct policy_mgr_conc_connection_info
 	pm_conc_connection_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 
@@ -599,6 +597,11 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
+	// ASUs debug
+	policy_mgr_debug("ASUS debug policy_mgr_update_conc_list update");
+	policy_mgr_debug("pm_conc_connection_list[conn_index %d] mode %d, freq %d, mac %d, chain_mask %d, vdev_id %d, in_use %d",
+ 	conn_index, mode, ch_freq, mac, chain_mask, vdev_id, in_use);
+
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	pm_conc_connection_list[conn_index].mode = mode;
 	pm_conc_connection_list[conn_index].freq = ch_freq;
@@ -631,9 +634,6 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 		if (pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb)
 			pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb(mcc_mode);
 	}
-
-	if (pm_ctx->conc_cbacks.connection_info_update)
-		pm_ctx->conc_cbacks.connection_info_update();
 }
 
 /**
@@ -1409,21 +1409,7 @@ void policy_mgr_set_pcl_for_connected_vdev(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id, bool clear_pcl)
 {
 	struct policy_mgr_pcl_list msg = { {0} };
-	struct wlan_objmgr_vdev *vdev;
 	uint8_t roam_enabled_vdev_id;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_POLICY_MGR_ID);
-	if (!vdev) {
-		policy_mgr_err("vdev is NULL");
-		return;
-	}
-
-	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
-		return;
-	}
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
 	/*
 	 * Get the vdev id of the STA on which roaming is already
@@ -1571,7 +1557,6 @@ static uint32_t pm_get_vdev_id_of_first_conn_idx(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t conn_index = 0, vdev_id = 0;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	struct wlan_objmgr_vdev *vdev;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -1583,22 +1568,16 @@ static uint32_t pm_get_vdev_id_of_first_conn_idx(struct wlan_objmgr_psoc *psoc)
 	     conn_index++)  {
 		if (pm_conc_connection_list[conn_index].in_use) {
 			vdev_id = pm_conc_connection_list[conn_index].vdev_id;
-			policy_mgr_debug("Use vdev_id:%d for opportunistic upgrade",
-					 vdev_id);
 			break;
 		}
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-	if (conn_index == MAX_NUMBER_OF_CONC_CONNECTIONS) {
-		vdev = wlan_objmgr_pdev_get_first_vdev(pm_ctx->pdev,
-						       WLAN_POLICY_MGR_ID);
-		if (vdev) {
-			vdev_id = wlan_vdev_get_id(vdev);
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
-		}
+	if (conn_index == MAX_NUMBER_OF_CONC_CONNECTIONS)
 		policy_mgr_debug("Use default vdev_id:%d for opportunistic upgrade",
 				 vdev_id);
-	}
+	else
+		policy_mgr_debug("Use vdev_id:%d for opportunistic upgrade",
+				 vdev_id);
 
 	return vdev_id;
 }
@@ -3617,9 +3596,8 @@ policy_mgr_init_sap_mandatory_chan_by_band(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 	if (band_bitmap & BIT(REG_BAND_5G))
-		for (i = 0; i < ARRAY_SIZE(sap_mand_5g_freq_list); i++)
-			policy_mgr_add_sap_mandatory_chan(
-				psoc, sap_mand_5g_freq_list[i]);
+		policy_mgr_add_sap_mandatory_chan(psoc,
+						  SAP_MANDATORY_5G_CH_FREQ);
 	if (band_bitmap & BIT(REG_BAND_6G))
 		policy_mgr_add_sap_mandatory_6ghz_chan(psoc);
 }

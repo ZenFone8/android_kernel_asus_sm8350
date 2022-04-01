@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -743,7 +743,7 @@ static QDF_STATUS nan_handle_ndp_end_rsp(
 
 	/* Unblock the wait here if NDP_END request is a failure */
 	if (rsp->status != 0) {
-		request = osif_request_get(psoc_nan_obj->ndp_request_ctx);
+		request = osif_request_get(psoc_nan_obj->request_context);
 		if (request) {
 			osif_request_complete(request);
 			osif_request_put(request);
@@ -811,7 +811,7 @@ static QDF_STATUS nan_handle_end_ind(
 						     NDP_END_IND, ind);
 
 	/* Unblock the NDP_END wait */
-	request = osif_request_get(psoc_nan_obj->ndp_request_ctx);
+	request = osif_request_get(psoc_nan_obj->request_context);
 	if (request) {
 		osif_request_complete(request);
 		osif_request_put(request);
@@ -827,7 +827,6 @@ static QDF_STATUS nan_handle_enable_rsp(struct nan_event_params *nan_event)
 	QDF_STATUS status;
 	void (*call_back)(void *cookie);
 	uint8_t vdev_id;
-	void (*nan_conc_callback)(void);
 
 	psoc = nan_event->psoc;
 	psoc_nan_obj = nan_get_psoc_priv_obj(psoc);
@@ -875,12 +874,9 @@ fail:
 	policy_mgr_check_n_start_opportunistic_timer(psoc);
 
 done:
-	nan_conc_callback = psoc_nan_obj->cb_obj.nan_concurrency_update;
-	if (nan_conc_callback)
-		nan_conc_callback();
 	call_back = psoc_nan_obj->cb_obj.ucfg_nan_request_process_cb;
 	if (call_back)
-		call_back(psoc_nan_obj->nan_disc_request_ctx);
+		call_back(psoc_nan_obj->request_context);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -890,7 +886,6 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 	struct nan_psoc_priv_obj *psoc_nan_obj;
 	QDF_STATUS status;
 	uint8_t vdev_id;
-	void (*nan_conc_callback)(void);
 
 	if (!psoc) {
 		nan_err("psoc is NULL");
@@ -914,7 +909,7 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 		policy_mgr_decr_session_set_pcl(psoc, QDF_NAN_DISC_MODE,
 						vdev_id);
 		if (psoc_nan_obj->is_explicit_disable && call_back)
-			call_back(psoc_nan_obj->nan_disc_request_ctx);
+			call_back(psoc_nan_obj->request_context);
 
 		policy_mgr_nan_sap_post_disable_conc_check(psoc);
 	} else {
@@ -922,9 +917,6 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 		nan_err("Cannot set NAN state to disabled!");
 		return QDF_STATUS_E_FAILURE;
 	}
-	nan_conc_callback = psoc_nan_obj->cb_obj.nan_concurrency_update;
-	if (nan_conc_callback)
-		nan_conc_callback();
 
 	return status;
 }
@@ -1406,9 +1398,4 @@ bool wlan_nan_get_sap_conc_support(struct wlan_objmgr_psoc *psoc)
 
 	return (psoc_nan_obj->nan_caps.nan_sap_supported &&
 		ucfg_is_nan_conc_control_supported(psoc));
-}
-
-bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
-{
-	return ucfg_nan_is_beamforming_supported(psoc);
 }

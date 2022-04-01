@@ -29,21 +29,6 @@ get_stats_req_twt_dialog_id(struct infra_cp_stats_cmd_info *req)
 	return req->dialog_id;
 }
 
-static enum WMI_HOST_GET_STATS_TWT_STATUS
-wmi_get_converted_twt_get_stats_status(WMI_GET_STATS_TWT_STATUS_T tgt_status)
-{
-	switch (tgt_status) {
-	case WMI_GET_STATS_TWT_STATUS_OK:
-		return WMI_HOST_GET_STATS_TWT_STATUS_OK;
-	case WMI_GET_STATS_TWT_STATUS_DIALOG_ID_NOT_EXIST:
-		return WMI_HOST_GET_STATS_TWT_STATUS_DIALOG_ID_NOT_EXIST;
-	case WMI_GET_STATS_TWT_STATUS_INVALID_PARAM:
-		return WMI_HOST_GET_STATS_TWT_STATUS_INVALID_PARAM;
-	default:
-		return WMI_HOST_GET_STATS_TWT_STATUS_UNKNOWN_ERROR;
-	}
-}
-
 static inline
 void wmi_extract_ctrl_path_twt_stats_tlv(void *tag_buf,
 					 struct twt_infra_cp_stats_event *param)
@@ -52,7 +37,7 @@ void wmi_extract_ctrl_path_twt_stats_tlv(void *tag_buf,
 			(wmi_ctrl_path_twt_stats_struct *)tag_buf;
 
 	param->dialog_id = wmi_stats_buf->dialog_id;
-	param->status = wmi_get_converted_twt_get_stats_status(wmi_stats_buf->status);
+	param->status = wmi_stats_buf->status;
 	param->num_sp_cycles = wmi_stats_buf->num_sp_cycles;
 	param->avg_sp_dur_us = wmi_stats_buf->avg_sp_dur_us;
 	param->min_sp_dur_us = wmi_stats_buf->min_sp_dur_us;
@@ -150,10 +135,8 @@ QDF_STATUS wmi_stats_handler(void *buff, int32_t len,
 	uint8_t *tag_start_ptr;
 
 	param_buf = (WMI_CTRL_PATH_STATS_EVENTID_param_tlvs *)buff;
-	if (!param_buf) {
-		wmi_err_rl("param_buf is NULL");
+	if (!param_buf)
 		return QDF_STATUS_E_FAILURE;
-	}
 	ev = (wmi_ctrl_path_stats_event_fixed_param *)param_buf->fixed_param;
 
 	curr_tlv_tag = WMITLV_GET_TLVTAG(ev->tlv_header);
@@ -418,57 +401,12 @@ send_stats_request_cmd_tlv(wmi_unified_t wmi_handle,
 					  WMI_REQUEST_STATS_CMDID);
 
 	if (ret) {
-		wmi_err("Failed to send stats request to fw =%d", ret);
+		wmi_err("Failed to send status request to fw =%d", ret);
 		wmi_buf_free(buf);
 	}
 
 	return qdf_status_from_os_return(ret);
 }
-
-#ifdef WLAN_FEATURE_BIG_DATA_STATS
-/**
- * send_big_data_stats_request_cmd_tlv () - send big data stats cmd
- * @wmi_handle: wmi handle
- * @param : pointer to command request param
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
-static QDF_STATUS
-send_big_data_stats_request_cmd_tlv(wmi_unified_t wmi_handle,
-				    struct stats_request_params *param)
-{
-	int32_t ret = 0;
-	wmi_vdev_get_big_data_p2_cmd_fixed_param *cmd;
-	wmi_buf_t buf;
-	uint16_t len = sizeof(wmi_vdev_get_big_data_p2_cmd_fixed_param);
-
-	buf = wmi_buf_alloc(wmi_handle, len);
-	if (!buf)
-		return QDF_STATUS_E_NOMEM;
-
-	cmd = (wmi_vdev_get_big_data_p2_cmd_fixed_param *)wmi_buf_data(buf);
-	WMITLV_SET_HDR(
-		&cmd->tlv_header,
-		WMITLV_TAG_STRUC_wmi_vdev_get_big_data_p2_cmd_fixed_param,
-		WMITLV_GET_STRUCT_TLVLEN
-		(wmi_vdev_get_big_data_p2_cmd_fixed_param));
-
-	cmd->vdev_id = param->vdev_id;
-
-	wmi_debug("STATS VDEV_ID:%d -->", cmd->vdev_id);
-
-	wmi_mtrace(WMI_VDEV_GET_BIG_DATA_P2_CMDID, cmd->vdev_id, 0);
-	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
-				   WMI_VDEV_GET_BIG_DATA_P2_CMDID);
-
-	if (ret) {
-		wmi_err("Failed to send big data stats request to fw =%d", ret);
-		wmi_buf_free(buf);
-	}
-
-	return qdf_status_from_os_return(ret);
-}
-#endif
 
 /**
  * extract_all_stats_counts_tlv() - extract all stats count from event
@@ -919,10 +857,6 @@ void wmi_cp_stats_attach_tlv(wmi_unified_t wmi_handle)
 	struct wmi_ops *ops = wmi_handle->ops;
 
 	ops->send_stats_request_cmd = send_stats_request_cmd_tlv;
-#ifdef WLAN_FEATURE_BIG_DATA_STATS
-	ops->send_big_data_stats_request_cmd =
-				send_big_data_stats_request_cmd_tlv;
-#endif
 	ops->extract_all_stats_count = extract_all_stats_counts_tlv;
 	ops->extract_pdev_stats = extract_pdev_stats_tlv;
 	ops->extract_vdev_stats = extract_vdev_stats_tlv;

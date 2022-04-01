@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -76,45 +76,6 @@ cm_roam_fill_rssi_change_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * cm_roam_is_per_roam_allowed()  - Check if PER roam trigger needs to be
- * disabled based on the current connected rates.
- * @psoc:   Pointer to the psoc object
- * @vdev_id: Vdev id
- *
- * Return: true if PER roam trigger is allowed
- */
-static bool
-cm_roam_is_per_roam_allowed(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
-{
-	struct qdf_mac_addr connected_bssid = {0};
-	struct wlan_objmgr_vdev *vdev;
-	enum wlan_phymode peer_phymode = WLAN_PHYMODE_AUTO;
-	QDF_STATUS status;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_CM_ID);
-	if (!vdev) {
-		mlme_err("Vdev is null for vdev_id:%d", vdev_id);
-		return false;
-	}
-
-	status = wlan_vdev_get_bss_peer_mac(vdev, &connected_bssid);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		return false;
-
-	mlme_get_peer_phymode(psoc, connected_bssid.bytes, &peer_phymode);
-	if (peer_phymode < WLAN_PHYMODE_11NA_HT20) {
-		mlme_debug("vdev:%d PER roam trigger disabled for phymode:%d",
-			   peer_phymode, vdev_id);
-		return false;
-	}
-
-	return true;
-}
-
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * cm_roam_reason_vsie() - set roam reason vsie
@@ -152,26 +113,13 @@ static void
 cm_roam_triggers(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		 struct wlan_roam_triggers *params)
 {
-	bool is_per_roam_enabled;
-
 	params->vdev_id = vdev_id;
 	params->trigger_bitmap =
 		mlme_get_roam_trigger_bitmap(psoc, vdev_id);
-
-	/*
-	 * Disable PER trigger for phymode less than 11n to avoid
-	 * frequent roams as the PER rate threshold is greater than
-	 * 11a/b/g rates
-	 */
-	is_per_roam_enabled = cm_roam_is_per_roam_allowed(psoc, vdev_id);
-	if (!is_per_roam_enabled)
-		params->trigger_bitmap &= ~BIT(ROAM_TRIGGER_REASON_PER);
-
 	params->roam_scan_scheme_bitmap =
 		wlan_cm_get_roam_scan_scheme_bitmap(psoc, vdev_id);
-	wlan_cm_roam_get_vendor_btm_params(psoc, &params->vendor_btm_param);
-	wlan_cm_roam_get_score_delta_params(psoc, params);
-	wlan_cm_roam_get_min_rssi_params(psoc, params);
+	wlan_cm_roam_get_vendor_btm_params(psoc, vdev_id,
+					   &params->vendor_btm_param);
 }
 
 /**
@@ -720,7 +668,7 @@ cm_roam_fill_per_roam_request(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * cm_roam_offload_per_config() - populates roam offload scan request and sends
+ * cm_roam_offload_per_scan() - populates roam offload scan request and sends
  * to fw
  * @psoc: psoc context
  * @vdev_id: vdev id
@@ -731,17 +679,7 @@ static QDF_STATUS
 cm_roam_offload_per_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 {
 	struct wlan_per_roam_config_req *req;
-	bool is_per_roam_enabled;
 	QDF_STATUS status;
-
-	/*
-	 * Disable PER trigger for phymode less than 11n to avoid
-	 * frequent roams as the PER rate threshold is greater than
-	 * 11a/b/g rates
-	 */
-	is_per_roam_enabled = cm_roam_is_per_roam_allowed(psoc, vdev_id);
-	if (!is_per_roam_enabled)
-		return QDF_STATUS_SUCCESS;
 
 	req = qdf_mem_malloc(sizeof(*req));
 	if (!req)
@@ -941,7 +879,6 @@ cm_roam_switch_to_deinit(struct wlan_objmgr_pdev *pdev,
 
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_DEINIT);
 	mlme_clear_operations_bitmap(psoc, vdev_id);
-	wlan_cm_roam_activate_pcl_per_vdev(psoc, vdev_id, false);
 
 	if (reason != REASON_SUPPLICANT_INIT_ROAMING)
 		wlan_cm_enable_roaming_on_connected_sta(pdev, vdev_id);

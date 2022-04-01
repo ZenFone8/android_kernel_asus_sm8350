@@ -699,8 +699,7 @@ static void populate_dot11f_tdls_ht_vht_cap(struct mac_context *mac,
 		nss = mac->vdev_type_nss_2g.tdls;
 
 	nss = QDF_MIN(nss, mac->user_configured_nss);
-	if (IS_DOT11_MODE_HT(selfDot11Mode) &&
-	    !lim_is_he_6ghz_band(pe_session)) {
+	if (IS_DOT11_MODE_HT(selfDot11Mode)) {
 		/* Include HT Capability IE */
 		populate_dot11f_ht_caps(mac, pe_session, htCap);
 		val_len = SIZE_OF_SUPPORTED_MCS_SET;
@@ -782,65 +781,6 @@ static void populate_dot11f_tdls_ht_vht_cap(struct mac_context *mac,
 }
 
 #ifdef WLAN_FEATURE_11AX
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-static void
-lim_tdls_populate_dot11f_6hgz_he_caps(struct mac_context *mac,
-				      struct tdls_add_sta_req *add_sta_req,
-				      tDot11fIEhe_6ghz_band_cap *pDot11f)
-{
-	union {
-		struct hecap_6ghz he_6ghz_cap;
-		struct he_6ghz_capability_info dot11f;
-	} peer_cfg;
-
-	if (!add_sta_req->he_6ghz_cap.a_mpdu_params &&
-	    !add_sta_req->he_6ghz_cap.info) {
-		tdls_debug("6Ghz HE capabilities not present");
-		return;
-	}
-
-	qdf_mem_copy(&peer_cfg.he_6ghz_cap,
-		     &add_sta_req->he_6ghz_cap,
-		     sizeof(add_sta_req->he_6ghz_cap));
-
-	pDot11f->present = 1;
-	pDot11f->min_mpdu_start_spacing =
-				peer_cfg.dot11f.min_mpdu_start_spacing;
-	pDot11f->max_ampdu_len_exp = peer_cfg.dot11f.max_ampdu_len_exp;
-	pDot11f->max_mpdu_len = peer_cfg.dot11f.max_mpdu_len;
-	pDot11f->sm_pow_save = peer_cfg.dot11f.sm_pow_save;
-	pDot11f->rd_responder = peer_cfg.dot11f.rd_responder;
-	pDot11f->rx_ant_pattern_consistency =
-				peer_cfg.dot11f.rx_ant_pattern_consistency;
-	pDot11f->tx_ant_pattern_consistency =
-				peer_cfg.dot11f.tx_ant_pattern_consistency;
-
-	lim_log_he_6g_cap(mac, pDot11f);
-}
-
-static void lim_populate_tdls_setup_6g_cap(struct mac_context *mac,
-					   tDot11fIEhe_6ghz_band_cap *hecap_6g,
-					   struct pe_session *session)
-{
-	if (hecap_6g)
-		populate_dot11f_he_6ghz_cap(mac, session, hecap_6g);
-}
-
-#else
-static void
-lim_tdls_populate_dot11f_6hgz_he_caps(struct mac_context *mac,
-				      struct tdls_add_sta_req *add_sta_req,
-				      tDot11fIEhe_6ghz_band_cap *pDot11f)
-{
-}
-
-static void lim_populate_tdls_setup_6g_cap(struct mac_context *mac,
-					   tDot11fIEhe_6ghz_band_cap *hecap_6g,
-					   struct pe_session *session)
-{
-}
-#endif
-
 static void lim_tdls_set_he_chan_width(tDot11fIEhe_cap *heCap,
 				       struct pe_session *session)
 {
@@ -873,17 +813,11 @@ static void lim_tdls_set_he_chan_width(tDot11fIEhe_cap *heCap,
 static void populate_dot11f_set_tdls_he_cap(struct mac_context *mac,
 					    uint32_t selfDot11Mode,
 					    tDot11fIEhe_cap *heCap,
-					    tDot11fIEhe_6ghz_band_cap *hecap_6g,
 					    struct pe_session *session)
 {
 	if (IS_DOT11_MODE_HE(selfDot11Mode)) {
 		populate_dot11f_he_caps(mac, NULL, heCap);
 		lim_tdls_set_he_chan_width(heCap, session);
-		lim_log_he_cap(mac, heCap);
-		lim_populate_tdls_setup_6g_cap(mac, hecap_6g, session);
-	} else {
-		pe_debug("Not populating he cap as SelfDot11Mode not HE %d",
-			 selfDot11Mode);
 	}
 }
 
@@ -893,8 +827,7 @@ static void lim_tdls_fill_dis_rsp_he_cap(struct mac_context *mac,
 					 struct pe_session *pe_session)
 {
 	populate_dot11f_set_tdls_he_cap(mac, selfDot11Mode,
-					&tdls_dis_rsp->he_cap, NULL,
-					pe_session);
+					&tdls_dis_rsp->he_cap, pe_session);
 }
 
 static void lim_tdls_fill_setup_req_he_cap(struct mac_context *mac,
@@ -903,9 +836,7 @@ static void lim_tdls_fill_setup_req_he_cap(struct mac_context *mac,
 					   struct pe_session *pe_session)
 {
 	populate_dot11f_set_tdls_he_cap(mac, selfDot11Mode,
-					&tdls_setup_req->he_cap,
-					&tdls_setup_req->he_6ghz_band_cap,
-					pe_session);
+					&tdls_setup_req->he_cap, pe_session);
 }
 
 static void lim_tdls_fill_setup_rsp_he_cap(struct mac_context *mac,
@@ -914,34 +845,7 @@ static void lim_tdls_fill_setup_rsp_he_cap(struct mac_context *mac,
 					   struct pe_session *pe_session)
 {
 	populate_dot11f_set_tdls_he_cap(mac, selfDot11Mode,
-					&tdls_setup_rsp->he_cap,
-					&tdls_setup_rsp->he_6ghz_band_cap,
-					pe_session);
-}
-
-static void lim_tdls_populate_he_operations(struct mac_context *mac,
-					    struct pe_session *pe_session,
-					    tDot11fIEhe_op *he_op)
-{
-	struct wlan_mlme_he_caps *he_cap_info;
-	uint16_t mcs_set = 0;
-
-	he_cap_info = &mac->mlme_cfg->he_caps;
-	he_op->co_located_bss = 0;
-	he_op->bss_color = pe_session->he_bss_color_change.new_color;
-	if (!he_op->bss_color)
-		he_op->bss_col_disabled = 1;
-
-	mcs_set = (uint16_t)he_cap_info->he_ops_basic_mcs_nss;
-	if (pe_session->nss == NSS_1x1_MODE)
-		mcs_set |= 0xFFFC;
-	else
-		mcs_set |= 0xFFF0;
-
-	*((uint16_t *)he_op->basic_mcs_nss) = mcs_set;
-	populate_dot11f_he_operation(mac,
-				     pe_session,
-				     he_op);
+					&tdls_setup_rsp->he_cap, pe_session);
 }
 
 static void lim_tdls_fill_setup_cnf_he_op(struct mac_context *mac,
@@ -950,9 +854,9 @@ static void lim_tdls_fill_setup_cnf_he_op(struct mac_context *mac,
 					  struct pe_session *pe_session)
 {
 	if (CHECK_BIT(peer_capability, TDLS_PEER_HE_CAP))
-		lim_tdls_populate_he_operations(mac,
-						pe_session,
-						&tdls_setup_cnf->he_op);
+		populate_dot11f_he_operation(mac,
+					     pe_session,
+					     &tdls_setup_cnf->he_op);
 }
 
 static void lim_tdls_populate_he_matching_rate_set(struct mac_context *mac_ctx,
@@ -975,15 +879,9 @@ lim_tdls_populate_dot11f_he_caps(struct mac_context *mac,
 		struct he_capability_info he_cap;
 	} uHECapInfo;
 
-	if (add_sta_req->he_cap_len < MIN_TDLS_HE_CAP_LEN) {
-		pe_debug("He_capability invalid");
-		return QDF_STATUS_E_INVAL;
-	}
-
 	qdf_mem_copy(&uHECapInfo.nCfgValue, &add_sta_req->he_cap,
 		     sizeof(uHECapInfo.nCfgValue));
 
-	pDot11f->present = 1;
 	pDot11f->htc_he = uHECapInfo.he_cap.htc_he;
 	pDot11f->twt_request = uHECapInfo.he_cap.twt_request;
 	pDot11f->twt_responder = uHECapInfo.he_cap.twt_responder;
@@ -1096,15 +994,9 @@ lim_tdls_populate_dot11f_he_caps(struct mac_context *mac,
 		*((uint16_t *)pDot11f->tx_he_mcs_map_80_80) =
 			uHECapInfo.he_cap.tx_he_mcs_map_80_80;
 	}
+	lim_log_he_cap(mac, pDot11f);
 
 	return QDF_STATUS_SUCCESS;
-}
-
-static void lim_tdls_check_and_force_he_ldpc_cap(struct pe_session *pe_session,
-						 tDphHashNode *sta)
-{
-	if (pe_session && sta->he_config.present)
-		lim_check_and_force_he_ldpc_cap(pe_session, &sta->he_config);
 }
 
 static void lim_tdls_update_node_he_caps(struct mac_context *mac,
@@ -1112,33 +1004,13 @@ static void lim_tdls_update_node_he_caps(struct mac_context *mac,
 					 tDphHashNode *sta,
 					 struct pe_session *pe_session)
 {
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
 	pe_debug("Populating HE IEs");
-	status = lim_tdls_populate_dot11f_he_caps(mac, add_sta_req,
-						  &sta->he_config);
-
-	if (status != QDF_STATUS_SUCCESS)
-		return;
-
+	lim_tdls_populate_dot11f_he_caps(mac, add_sta_req, &sta->he_config);
 	if (sta->he_config.present)
 		sta->mlmStaContext.he_capable = 1;
 
 	if (pe_session && sta->he_config.present)
 		lim_tdls_set_he_chan_width(&sta->he_config, pe_session);
-
-	lim_log_he_cap(mac, &sta->he_config);
-
-	if (lim_is_he_6ghz_band(pe_session)) {
-		lim_tdls_populate_dot11f_6hgz_he_caps(mac, add_sta_req,
-						      &sta->he_6g_band_cap);
-		/*
-		 * In 6Ghz, vht and ht ie may not present, peer channel width
-		 * is populated while extracting HT and VHT cap itself. So,
-		 * incase of 6ghz fill the chan_width.
-		 */
-		lim_update_stads_he_6ghz_op(pe_session, sta);
-	}
 }
 
 #else
@@ -1183,12 +1055,6 @@ static void lim_tdls_update_node_he_caps(struct mac_context *mac,
 					 struct pe_session *pe_session)
 {
 }
-
-static void lim_tdls_check_and_force_he_ldpc_cap(struct pe_session *pe_session,
-						 tDphHashNode *sta)
-{
-}
-
 #endif
 
 /*
@@ -1524,21 +1390,21 @@ void lim_set_tdls_flags(struct roam_offload_synch_ind *roam_sync_ind_ptr,
  */
 static
 QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
-					      struct qdf_mac_addr peer_mac,
-					      uint8_t dialog,
-					      struct pe_session *pe_session,
-					      uint8_t *addIe,
-					      uint16_t addIeLen,
-					      enum wifi_traffic_ac ac)
+						 struct qdf_mac_addr peer_mac,
+						 uint8_t dialog,
+						 struct pe_session *pe_session,
+						 uint8_t *addIe,
+						 uint16_t addIeLen,
+						 enum wifi_traffic_ac ac)
 {
-	tDot11fTDLSSetupReq *tdls_setup_req;
+	tDot11fTDLSSetupReq tdlsSetupReq;
 	uint16_t caps = 0;
 	uint32_t status = 0;
-	uint32_t payload = 0;
-	uint32_t nbytes = 0;
+	uint32_t nPayload = 0;
+	uint32_t nBytes = 0;
 	uint32_t header_offset = 0;
-	uint8_t *frame;
-	void *packet;
+	uint8_t *pFrame;
+	void *pPacket;
 	QDF_STATUS qdf_status;
 	uint32_t selfDot11Mode;
 	uint8_t smeSessionId = 0;
@@ -1550,28 +1416,20 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 /*  As of now, we hardcoded to max channel bonding of dot11Mode (i.e HT80 for 11ac/HT40 for 11n) */
 /*  uint32_t tdlsChannelBondingMode; */
 
-	if (!pe_session) {
-		pe_err("pe_session is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	tdls_setup_req = qdf_mem_malloc(sizeof(*tdls_setup_req));
-	if (!tdls_setup_req)
-		return QDF_STATUS_E_NOMEM;
-
 	/*
 	 * The scheme here is to fill out a 'tDot11fProbeRequest' structure
 	 * and then hand it off to 'dot11f_pack_probe_request' (for
-	 * serialization).
+	 * serialization).  We start by zero-initializing the structure:
 	 */
 	smeSessionId = pe_session->smeSessionId;
 
-	tdls_setup_req->Category.category = ACTION_CATEGORY_TDLS;
-	tdls_setup_req->Action.action = TDLS_SETUP_REQUEST;
-	tdls_setup_req->DialogToken.token = dialog;
+	qdf_mem_zero((uint8_t *) &tdlsSetupReq, sizeof(tDot11fTDLSSetupReq));
+	tdlsSetupReq.Category.category = ACTION_CATEGORY_TDLS;
+	tdlsSetupReq.Action.action = TDLS_SETUP_REQUEST;
+	tdlsSetupReq.DialogToken.token = dialog;
 
 	populate_dot11f_link_iden(mac, pe_session,
-				  &tdls_setup_req->LinkIdentifier, peer_mac,
+				  &tdlsSetupReq.LinkIdentifier, peer_mac,
 				  TDLS_INITIATOR);
 
 	if (lim_get_capability_info(mac, &caps, pe_session) !=
@@ -1582,12 +1440,12 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 		 */
 		pe_err("could not retrieve Capabilities value");
 	}
-	swap_bit_field16(caps, (uint16_t *)&tdls_setup_req->Capabilities);
+	swap_bit_field16(caps, (uint16_t *) &tdlsSetupReq.Capabilities);
 
 	/* populate supported rate and ext supported rate IE */
 	if (QDF_STATUS_E_FAILURE == populate_dot11f_rates_tdls(mac,
-					&tdls_setup_req->SuppRates,
-					&tdls_setup_req->ExtSuppRates,
+					&tdlsSetupReq.SuppRates,
+					&tdlsSetupReq.ExtSuppRates,
 					wlan_reg_freq_to_chan(
 					mac->pdev, pe_session->curr_op_freq)))
 		pe_err("could not populate supported data rates");
@@ -1595,24 +1453,24 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 	/* Populate extended capability IE */
 	populate_dot11f_tdls_ext_capability(mac,
 					    pe_session,
-					    &tdls_setup_req->ExtCap);
+					    &tdlsSetupReq.ExtCap);
 
 	if (1 == mac->lim.gLimTDLSWmmMode) {
 
 		pe_debug("populate WMM IE in Setup Request Frame");
 		sp_length = mac->mlme_cfg->wmm_params.max_sp_length;
 		/* include WMM IE */
-		tdls_setup_req->WMMInfoStation.version = SIR_MAC_OUI_VERSION_1;
-		tdls_setup_req->WMMInfoStation.acvo_uapsd =
+		tdlsSetupReq.WMMInfoStation.version = SIR_MAC_OUI_VERSION_1;
+		tdlsSetupReq.WMMInfoStation.acvo_uapsd =
 			(mac->lim.gLimTDLSUapsdMask & 0x01);
-		tdls_setup_req->WMMInfoStation.acvi_uapsd =
+		tdlsSetupReq.WMMInfoStation.acvi_uapsd =
 			((mac->lim.gLimTDLSUapsdMask & 0x02) >> 1);
-		tdls_setup_req->WMMInfoStation.acbk_uapsd =
+		tdlsSetupReq.WMMInfoStation.acbk_uapsd =
 			((mac->lim.gLimTDLSUapsdMask & 0x04) >> 2);
-		tdls_setup_req->WMMInfoStation.acbe_uapsd =
+		tdlsSetupReq.WMMInfoStation.acbe_uapsd =
 			((mac->lim.gLimTDLSUapsdMask & 0x08) >> 3);
-		tdls_setup_req->WMMInfoStation.max_sp_length = sp_length;
-		tdls_setup_req->WMMInfoStation.present = 1;
+		tdlsSetupReq.WMMInfoStation.max_sp_length = sp_length;
+		tdlsSetupReq.WMMInfoStation.present = 1;
 	} else {
 		/*
 		 * TODO: we need to see if we have to support conditions where
@@ -1631,16 +1489,16 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 		 */
 
 		pe_debug("populate QOS IE in Setup Request Frame");
-		tdls_setup_req->QOSCapsStation.present = 1;
-		tdls_setup_req->QOSCapsStation.max_sp_length = 0;
-		tdls_setup_req->QOSCapsStation.qack = 0;
-		tdls_setup_req->QOSCapsStation.acbe_uapsd =
+		tdlsSetupReq.QOSCapsStation.present = 1;
+		tdlsSetupReq.QOSCapsStation.max_sp_length = 0;
+		tdlsSetupReq.QOSCapsStation.qack = 0;
+		tdlsSetupReq.QOSCapsStation.acbe_uapsd =
 			((mac->lim.gLimTDLSUapsdMask & 0x08) >> 3);
-		tdls_setup_req->QOSCapsStation.acbk_uapsd =
+		tdlsSetupReq.QOSCapsStation.acbk_uapsd =
 			((mac->lim.gLimTDLSUapsdMask & 0x04) >> 2);
-		tdls_setup_req->QOSCapsStation.acvi_uapsd =
+		tdlsSetupReq.QOSCapsStation.acvi_uapsd =
 			((mac->lim.gLimTDLSUapsdMask & 0x02) >> 1);
-		tdls_setup_req->QOSCapsStation.acvo_uapsd =
+		tdlsSetupReq.QOSCapsStation.acvo_uapsd =
 			(mac->lim.gLimTDLSUapsdMask & 0x01);
 	}
 
@@ -1653,15 +1511,14 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 	selfDot11Mode =  mac->mlme_cfg->dot11_mode.dot11_mode;
 
 	/* Populate HT/VHT Capabilities */
-	populate_dot11f_tdls_ht_vht_cap(mac, selfDot11Mode,
-					&tdls_setup_req->HTCaps,
-					&tdls_setup_req->VHTCaps, pe_session);
-	lim_tdls_fill_setup_req_he_cap(mac, selfDot11Mode, tdls_setup_req,
+	populate_dot11f_tdls_ht_vht_cap(mac, selfDot11Mode, &tdlsSetupReq.HTCaps,
+					&tdlsSetupReq.VHTCaps, pe_session);
+	lim_tdls_fill_setup_req_he_cap(mac, selfDot11Mode, &tdlsSetupReq,
 				       pe_session);
 
 	/* Populate AID */
 	populate_dotf_tdls_vht_aid(mac, selfDot11Mode, peer_mac,
-				   &tdls_setup_req->AID, pe_session);
+				   &tdlsSetupReq.AID, pe_session);
 
 	/* Populate TDLS offchannel param only if offchannel is enabled
 	 * and TDLS Channel Switching is not prohibited by AP in ExtCap
@@ -1670,11 +1527,12 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 	if ((1 == mac->lim.gLimTDLSOffChannelEnabled) &&
 	    (!pe_session->tdls_chan_swit_prohibited)) {
 		populate_dot11f_tdls_offchannel_params(mac, pe_session,
-					&tdls_setup_req->SuppChannels,
-					&tdls_setup_req->SuppOperatingClasses);
+						     &tdlsSetupReq.SuppChannels,
+						     &tdlsSetupReq.
+						     SuppOperatingClasses);
 		if (mac->mlme_cfg->gen.band_capability != BIT(REG_BAND_2G)) {
-			tdls_setup_req->ht2040_bss_coexistence.present = 1;
-			tdls_setup_req->ht2040_bss_coexistence.info_request = 1;
+			tdlsSetupReq.ht2040_bss_coexistence.present = 1;
+			tdlsSetupReq.ht2040_bss_coexistence.info_request = 1;
 		}
 	} else {
 		pe_debug("TDLS offchan not enabled, or channel switch prohibited by AP, gLimTDLSOffChannelEnabled: %d tdls_chan_swit_prohibited: %d",
@@ -1684,13 +1542,13 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 	/*
 	 * now we pack it.  First, how much space are we going to need?
 	 */
-	status = dot11f_get_packed_tdls_setup_req_size(mac, tdls_setup_req,
-						       &payload);
+	status = dot11f_get_packed_tdls_setup_req_size(mac, &tdlsSetupReq,
+						       &nPayload);
 	if (DOT11F_FAILED(status)) {
 		pe_err("Failed to calculate the packed size for a Setup Request (0x%08x)",
 			status);
 		/* We'll fall back on the worst case scenario: */
-		payload = sizeof(tDot11fProbeRequest);
+		nPayload = sizeof(tDot11fProbeRequest);
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("There were warnings while calculating the packed size for a Setup Request (0x%08x)",
 			status);
@@ -1702,24 +1560,23 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 	 * 8 bytes of RFC 1042 header
 	 */
 
-	nbytes = payload + ((IS_QOS_ENABLED(pe_session))
+	nBytes = nPayload + ((IS_QOS_ENABLED(pe_session))
 			     ? sizeof(tSirMacDataHdr3a) :
 			     sizeof(tSirMacMgmtHdr))
 		 + sizeof(eth_890d_header)
 		 + PAYLOAD_TYPE_TDLS_SIZE + addIeLen;
 
 	/* Ok-- try to allocate memory from MGMT PKT pool */
-	qdf_status = cds_packet_alloc((uint16_t)nbytes, (void **)&frame,
-				      (void **)&packet);
+	qdf_status = cds_packet_alloc((uint16_t) nBytes, (void **)&pFrame,
+			(void **)&pPacket);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		pe_err("Failed to allocate %d bytes for a TDLS Setup Request",
-			nbytes);
-		qdf_mem_free(tdls_setup_req);
+			nBytes);
 		return QDF_STATUS_E_NOMEM;
 	}
 
 	/* zero out the memory */
-	qdf_mem_zero(frame, nbytes);
+	qdf_mem_zero(pFrame, nBytes);
 
 	/*
 	 * IE formation, memory allocation is completed, Now form TDLS discovery
@@ -1728,34 +1585,30 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 
 	/* fill out the buffer descriptor */
 
-	header_offset = lim_prepare_tdls_frame_header(mac, frame,
-				&tdls_setup_req->LinkIdentifier,
-				TDLS_LINK_AP, TDLS_INITIATOR,
-				(ac == WIFI_AC_VI) ? TID_AC_VI : TID_AC_BK,
-				pe_session);
+	header_offset = lim_prepare_tdls_frame_header(mac, pFrame,
+			LINK_IDEN_ADDR_OFFSET(tdlsSetupReq),
+			TDLS_LINK_AP, TDLS_INITIATOR,
+			(ac == WIFI_AC_VI) ? TID_AC_VI : TID_AC_BK,
+			pe_session);
 
 	pe_debug("SupportedChnlWidth: %x rxMCSMap: %x rxMCSMap: %x txSupDataRate: %x",
-		tdls_setup_req->VHTCaps.supportedChannelWidthSet,
-		tdls_setup_req->VHTCaps.rxMCSMap,
-		tdls_setup_req->VHTCaps.txMCSMap,
-		tdls_setup_req->VHTCaps.txSupDataRate);
+		tdlsSetupReq.VHTCaps.supportedChannelWidthSet,
+		tdlsSetupReq.VHTCaps.rxMCSMap,
+		tdlsSetupReq.VHTCaps.txMCSMap,
+		tdlsSetupReq.VHTCaps.txSupDataRate);
 
-	status = dot11f_pack_tdls_setup_req(mac, tdls_setup_req,
-					    frame + header_offset,
-					    payload, &payload);
+	status = dot11f_pack_tdls_setup_req(mac, &tdlsSetupReq, pFrame
+					    + header_offset, nPayload, &nPayload);
 
 	if (DOT11F_FAILED(status)) {
 		pe_err("Failed to pack a TDLS Setup request (0x%08x)",
 			status);
-		cds_packet_free((void *)packet);
-		qdf_mem_free(tdls_setup_req);
+		cds_packet_free((void *)pPacket);
 		return QDF_STATUS_E_FAILURE;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("There were warnings while packing TDLS Setup Request (0x%08x)",
 			status);
 	}
-
-	qdf_mem_free(tdls_setup_req);
 
 	/* Copy the additional IE. */
 	/* TODO : addIe is added at the end of the frame. This means it doesn't */
@@ -1763,7 +1616,7 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 	/* if there is any IOT issue. */
 	if (addIeLen != 0) {
 		pe_debug("Copy Additional Ie Len = %d", addIeLen);
-		qdf_mem_copy(frame + header_offset + payload, addIe,
+		qdf_mem_copy(pFrame + header_offset + nPayload, addIe,
 			     addIeLen);
 	}
 
@@ -1773,15 +1626,15 @@ QDF_STATUS lim_send_tdls_link_setup_req_frame(struct mac_context *mac,
 		QDF_MAC_ADDR_REF(peer_mac.bytes));
 
 	mac->lim.tdls_frm_session_id = pe_session->smeSessionId;
-	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) frame,
+	lim_diag_mgmt_tx_event_report(mac, (tpSirMacMgmtHdr) pFrame,
 				      pe_session, QDF_STATUS_SUCCESS,
 				      QDF_STATUS_SUCCESS);
 
-	qdf_status = wma_tx_frame_with_tx_complete_send(mac, packet,
-							(uint16_t)nbytes,
-							TID_AC_VI,
-							frame,
-							smeSessionId, true);
+	qdf_status = wma_tx_frame_with_tx_complete_send(mac, pPacket,
+						     (uint16_t) nBytes,
+						     TID_AC_VI,
+						     pFrame,
+						     smeSessionId, true);
 
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		mac->lim.tdls_frm_session_id = NO_SESSION;
@@ -2833,7 +2686,7 @@ static void lim_tdls_update_hash_node_info(struct mac_context *mac,
 	tDot11fIEVHTCaps *pVhtCaps = NULL;
 	tDot11fIEVHTCaps *pVhtCaps_txbf = NULL;
 	tDot11fIEVHTCaps vhtCap;
-	uint8_t cbMode, selfDot11Mode;
+	uint8_t cbMode;
 
 	if (add_sta_req->tdls_oper == TDLS_OPER_ADD) {
 		populate_dot11f_ht_caps(mac, pe_session, &htCap);
@@ -2915,12 +2768,9 @@ static void lim_tdls_update_hash_node_info(struct mac_context *mac,
 		sta->vhtSupportedChannelWidthSet =
 			WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
 	}
-	selfDot11Mode = mac->mlme_cfg->dot11_mode.dot11_mode;
-	if (IS_DOT11_MODE_HE(selfDot11Mode))
-		lim_tdls_update_node_he_caps(mac, add_sta_req, sta, pe_session);
-	else
-		pe_debug("Not populating he cap as SelfDot11Mode not HE %d",
-			 selfDot11Mode);
+
+	lim_tdls_update_node_he_caps(mac, add_sta_req, sta, pe_session);
+
 	/*
 	 * Calculate the Secondary Coannel Offset if our
 	 * own channel bonding state is enabled
@@ -2956,8 +2806,6 @@ static void lim_tdls_update_hash_node_info(struct mac_context *mac,
 					    add_sta_req->supported_rates_length,
 					    add_sta_req->ht_cap.mcsset,
 					    pe_session, pVhtCaps);
-
-	lim_tdls_check_and_force_he_ldpc_cap(pe_session, sta);
 
 	/*  TDLS Dummy AddSTA does not have right capability , is it OK ??
 	 */

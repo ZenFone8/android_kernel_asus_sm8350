@@ -110,18 +110,11 @@ static tp_qdf_dp_trace_cb qdf_dp_trace_cb_table[QDF_DP_TRACE_MAX + 1];
  * string contains printf-like replacement parameters, which follow
  * this parameter in the variable argument list.
  *
- * Return: num of bytes written to buffer
+ * Return: None
  */
-int qdf_snprintf(char *str_buffer, unsigned int size, char *str_format, ...)
+void qdf_snprintf(char *str_buffer, unsigned int size, char *str_format, ...)
 {
-	va_list args;
-	int i;
-
-	va_start(args, str_format);
-	i = vsnprintf(str_buffer, size, str_format, args);
-	va_end(args);
-
-	return i;
+	snprintf(str_buffer, size, str_format);
 }
 qdf_export_symbol(qdf_snprintf);
 

@@ -333,7 +333,6 @@ QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
 				   uint32_t session_id, enum sme_ps_cmd command)
 {
 	struct wlan_mlme_powersave *powersave_params;
-	bool usr_cfg_ps_enable;
 
 	QDF_BUG(session_id < WLAN_MAX_VDEVS);
 	if (session_id >= WLAN_MAX_VDEVS)
@@ -346,10 +345,8 @@ QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	usr_cfg_ps_enable = mlme_get_user_ps(mac_ctx->psoc, session_id);
-	if (command == SME_PS_ENABLE && !usr_cfg_ps_enable) {
-		sme_debug("vdev:%d Cannot initiate PS. PS is disabled by usr(ioctl)",
-			  session_id);
+	if (command == SME_PS_ENABLE && !mac_ctx->usr_cfg_ps_enable) {
+		sme_debug("Cannot initiate PS. PS is disabled by usr(ioctl)");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -358,12 +355,20 @@ QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
 	 * for connected state as firmware can handle this
 	 */
 	if (!csr_is_conn_state_connected_infra(mac_ctx, session_id)) {
-		sme_debug("vdev:%d STA not infra/connected state",
+		sme_debug("STA not infra/connected state Session_id: %d",
 			  session_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void sme_save_usr_ps_cfg(mac_handle_t mac_handle, bool val)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+
+	mac_ctx->usr_cfg_ps_enable = val;
+	sme_debug("usr_cfg_ps_enable  %d", val);
 }
 
 /**
@@ -746,11 +751,8 @@ QDF_STATUS sme_ps_enable_auto_ps_timer(mac_handle_t mac_handle,
 	struct ps_params *ps_param = &ps_global_info->ps_params[session_id];
 	QDF_STATUS qdf_status;
 	QDF_TIMER_STATE cur_state;
-	bool usr_cfg_ps_enable;
 
-	usr_cfg_ps_enable =
-		mlme_get_user_ps(mac_ctx->psoc, session_id);
-	if (!timeout && !usr_cfg_ps_enable) {
+	if (!timeout && !mac_ctx->usr_cfg_ps_enable) {
 		sme_debug("auto_ps_timer called with timeout 0; ignore");
 		return QDF_STATUS_SUCCESS;
 	}
@@ -808,12 +810,13 @@ QDF_STATUS sme_ps_disable_auto_ps_timer(mac_handle_t mac_handle,
 
 QDF_STATUS sme_ps_open(mac_handle_t mac_handle)
 {
+
 	uint32_t i;
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+
+	mac_ctx->usr_cfg_ps_enable = true;
 
 	for (i = 0; i < WLAN_MAX_VDEVS; i++) {
-		mlme_set_user_ps(mac->psoc, i, true);
-
 		if (QDF_STATUS_SUCCESS != sme_ps_open_per_session(mac_handle,
 								  i)) {
 			sme_err("PMC Init Failed for session: %d", i);

@@ -32,7 +32,6 @@
 #include "wlan_mgmt_txrx_utils_api.h"
 #include <wlan_dfs_public_struct.h>
 #include <wlan_crypto_global_def.h>
-#include "wlan_thermal_public_struct.h"
 #ifdef WLAN_POWER_MANAGEMENT_OFFLOAD
 #include "wmi_unified_pmo_api.h"
 #endif
@@ -1494,12 +1493,14 @@ QDF_STATUS wmi_unified_process_ll_stats_get_cmd(wmi_unified_t wmi_handle,
  *                                              get station request
  * @wmi_handle: wmi handle
  * @get_req: unified ll stats and get station request command params
+ * @is_always_over_qmi: flag to send stats request always over qmi
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */
 QDF_STATUS wmi_process_unified_ll_stats_get_sta_cmd(
 				wmi_unified_t wmi_handle,
-				const struct ll_stats_get_params *get_req);
+				const struct ll_stats_get_params *get_req,
+				bool is_always_over_qmi);
 #endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
 
@@ -2966,19 +2967,13 @@ wmi_extract_chan_stats(wmi_unified_t wmi_handle, void *evt_buf,
  * @wmi_handle: wmi handle
  * @evt_buf: Pointer to event buffer
  * @temp: Pointer to hold extracted temperature
- * @level: Pointer to hold extracted level in host enum
- * @therm_throt_levels: Pointer to hold extracted number of level in thermal
- *                      stats
- * @tt_lvl_stats_event: Pointer to hold extracted thermal stats for each level
+ * @level: Pointer to hold extracted level
  * @pdev_id: Pointer to hold extracted pdev_id
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */
 QDF_STATUS wmi_extract_thermal_stats(wmi_unified_t wmi_handle, void *evt_buf,
-				     uint32_t *temp,
-				     enum thermal_throttle_level *level,
-				     uint32_t *therm_throt_levels,
-				     struct thermal_throt_level_stats *tt_stats,
+				     uint32_t *temp, uint32_t *level,
 				     uint32_t *pdev_id);
 
 /**
@@ -4133,20 +4128,6 @@ QDF_STATUS wmi_unified_extract_ani_level(wmi_unified_t wmi_handle,
 QDF_STATUS
 wmi_unified_extract_vdev_mgmt_offload_event(wmi_unified_t wmi, void *evt_buf,
 				struct mgmt_offload_event_params *params);
-#endif
-
-#ifdef WLAN_FEATURE_PKT_CAPTURE_V2
-/**
- * wmi_unified_extract_smart_monitor_event() - Extract smu event params
- * @wmi: WMI handle
- * @evt_buf: Event buffer
- * @params: Smart monitor event params
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wmi_unified_extract_smart_monitor_event(wmi_unified_t wmi, void *evt_buf,
-					struct smu_event_params *params);
 #endif
 
 #ifdef FEATURE_WLAN_TIME_SYNC_FTM

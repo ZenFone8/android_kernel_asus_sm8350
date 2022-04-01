@@ -92,14 +92,6 @@
 #define RADIOTAP_CCK_CHANNEL 0x0020
 #define RADIOTAP_OFDM_CHANNEL 0x0040
 
-
-#ifdef NBUF_MEMORY_DEBUG
-/* SMMU crash indication*/
-static qdf_atomic_t smmu_crashed;
-/* Number of nbuf not added to history*/
-unsigned long g_histroy_add_drop;
-#endif
-
 #ifdef FEATURE_NBUFF_REPLENISH_TIMER
 #include <qdf_mc_timer.h>
 
@@ -683,9 +675,7 @@ struct qdf_nbuf_event {
 	qdf_dma_addr_t iova;
 };
 
-#ifndef QDF_NBUF_HISTORY_SIZE
 #define QDF_NBUF_HISTORY_SIZE 4096
-#endif
 static qdf_atomic_t qdf_nbuf_history_index;
 static struct qdf_nbuf_event qdf_nbuf_history[QDF_NBUF_HISTORY_SIZE];
 
@@ -707,11 +697,6 @@ qdf_nbuf_history_add(qdf_nbuf_t nbuf, const char *func, uint32_t line,
 						   QDF_NBUF_HISTORY_SIZE);
 	struct qdf_nbuf_event *event = &qdf_nbuf_history[idx];
 
-	if (qdf_atomic_read(&smmu_crashed)) {
-		pr_info("Not adding network buf to the list");
-		return;
-	}
-
 	event->nbuf = nbuf;
 	qdf_str_lcopy(event->func, func, QDF_MEM_FUNC_NAME_SIZE);
 	event->line = line;
@@ -722,14 +707,6 @@ qdf_nbuf_history_add(qdf_nbuf_t nbuf, const char *func, uint32_t line,
 	else
 		event->iova = 0;
 }
-
-void qdf_set_smmu_fault_state(bool smmu_fault_state)
-{
-	qdf_atomic_set(&smmu_crashed, smmu_fault_state);
-	if (!smmu_fault_state)
-		g_histroy_add_drop = 0;
-}
-qdf_export_symbol(qdf_set_smmu_fault_state);
 #endif /* NBUF_MEMORY_DEBUG */
 
 #ifdef NBUF_MAP_UNMAP_DEBUG
@@ -4361,7 +4338,6 @@ qdf_nbuf_update_radiotap_he_mu_other_flags(struct mon_rx_status *rx_status,
 
 #define IEEE80211_RADIOTAP_TX_STATUS 0
 #define IEEE80211_RADIOTAP_RETRY_COUNT 1
-#define IEEE80211_RADIOTAP_EXTENSION2 2
 
 /**
  * This is the length for radiotap, combined length
@@ -4385,8 +4361,6 @@ qdf_nbuf_update_radiotap_he_mu_other_flags(struct mon_rx_status *rx_status,
  * 4 bytes padding for alignment
  */
 #define RADIOTAP_HEADER_EXT_LEN (2 * sizeof(uint32_t))
-#define RADIOTAP_HEADER_EXT2_LEN \
-	(sizeof(struct qdf_radiotap_ext2))
 #define RADIOTAP_HEADER_LEN (sizeof(struct ieee80211_radiotap_header) + \
 				RADIOTAP_FIXED_HEADER_LEN + \
 				RADIOTAP_HT_FLAGS_LEN + \
@@ -4396,8 +4370,7 @@ qdf_nbuf_update_radiotap_he_mu_other_flags(struct mon_rx_status *rx_status,
 				RADIOTAP_HE_MU_FLAGS_LEN + \
 				RADIOTAP_HE_MU_OTHER_FLAGS_LEN + \
 				RADIOTAP_VENDOR_NS_LEN + \
-				RADIOTAP_HEADER_EXT_LEN + \
-				RADIOTAP_HEADER_EXT2_LEN)
+				RADIOTAP_HEADER_EXT_LEN)
 
 #define IEEE80211_RADIOTAP_HE 23
 #define IEEE80211_RADIOTAP_HE_MU	24
@@ -4456,7 +4429,6 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 	uint32_t rtap_len = rtap_hdr_len;
 	uint8_t length = rtap_len;
 	struct qdf_radiotap_vendor_ns_ath *radiotap_vendor_ns_ath;
-	struct qdf_radiotap_ext2 *rtap_ext2;
 	uint32_t *rtap_ext = NULL;
 
 	/* Adding Extended Header space */
@@ -4660,24 +4632,6 @@ unsigned int qdf_nbuf_update_radiotap(struct mon_rx_status *rx_status,
 		rtap_len += 1;
 		rtap_buf[rtap_len] = rx_status->tx_retry_cnt;
 		rtap_len += 1;
-	}
-
-	/* Add Extension2 to Radiotap Header */
-	if (rx_status->add_rtap_ext2) {
-		rthdr->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_EXT);
-		rtap_ext = (uint32_t *)&rthdr->it_present;
-		rtap_ext++;
-		*rtap_ext |= cpu_to_le32(1 << IEEE80211_RADIOTAP_EXTENSION2);
-
-		rtap_ext2 = (struct qdf_radiotap_ext2 *)(rtap_buf + rtap_len);
-		rtap_ext2->ppdu_id = rx_status->ppdu_id;
-		rtap_ext2->prev_ppdu_id = rx_status->prev_ppdu_id;
-		rtap_ext2->tid = rx_status->tid;
-		rtap_ext2->start_seq = rx_status->start_seq;
-		qdf_mem_copy(rtap_ext2->ba_bitmap,
-			     rx_status->ba_bitmap, 8 * (sizeof(uint32_t)));
-
-		rtap_len += sizeof(*rtap_ext2);
 	}
 
 	rthdr->it_len = cpu_to_le16(rtap_len);
@@ -5015,4 +4969,3 @@ QDF_NBUF_TRACK *qdf_nbuf_get_track_tbl(uint32_t index)
 	return gp_qdf_net_buf_track_tbl[index];
 }
 #endif /* MEMORY_DEBUG */
-

@@ -1767,7 +1767,7 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 		for (count = 0; count < peer_stats->num_rates; count++) {
 			mcs_index = RATE_STAT_GET_MCS_INDEX(rate_stats->rate);
 			if (QDF_IS_STATUS_SUCCESS(status)) {
-				if (mcs_index < MAX_MCS)
+				if (rate_stats->rate && mcs_index < MAX_MCS)
 					rate_stats->rx_mpdu =
 					    dp_stats->rx.rx_mpdu_cnt[mcs_index];
 				else
@@ -2026,13 +2026,6 @@ static int wma_copy_chan_stats(uint32_t num_chan,
 		rs_results->channels = channels;
 		return 0;
 	}
-	if (rs_results->num_channels + num_chan > NUM_CHANNELS) {
-		wma_err("total chan stats num unexpected %d new %d",
-			rs_results->num_channels, num_chan);
-		/* do not add more */
-		qdf_mem_free(channels);
-		return 0;
-	}
 
 	rs_results->num_channels += num_chan;
 	rs_results->channels = qdf_mem_malloc(rs_results->num_channels *
@@ -2238,8 +2231,7 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 		chn_results =
 			(struct wifi_channel_stats *)&channels_in_this_event[0];
 		next_chan_offset = WMI_TLV_HDR_SIZE;
-		wma_debug("Channel Stats Info, radio id %d",
-			  radio_stats->radio_id);
+		wma_debug("Channel Stats Info");
 		for (count = 0; count < radio_stats->num_channels; count++) {
 			wma_nofl_debug("freq %u width %u freq0 %u freq1 %u awake time %u cca busy time %u",
 				       channel_stats->center_freq,
@@ -2544,13 +2536,14 @@ wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
 {
 	if (!(cfg_get(wma_handle->psoc, CFG_CLUB_LL_STA_AND_GET_STATION) &&
 	      wmi_service_enabled(wma_handle->wmi_handle,
-				  wmi_service_get_station_in_ll_stats_req) &&
-	      wma_handle->interfaces[cmd->vdev_id].type == WMI_VDEV_TYPE_STA))
+				  wmi_service_get_station_in_ll_stats_req)))
 		return wmi_unified_process_ll_stats_get_cmd(
 						wma_handle->wmi_handle, cmd);
 
-	return wmi_process_unified_ll_stats_get_sta_cmd(wma_handle->wmi_handle,
-							cmd);
+	return wmi_process_unified_ll_stats_get_sta_cmd(
+			wma_handle->wmi_handle, cmd,
+			cfg_get(wma_handle->psoc,
+				CFG_SEND_LL_AND_GET_STATION_STATS_OVER_QMI));
 }
 #else
 static QDF_STATUS
@@ -3189,13 +3182,18 @@ wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
 	case eSIR_11B_NW_TYPE:
 #ifdef FEATURE_WLAN_TDLS
 	if (STA_ENTRY_TDLS_PEER == sta_type) {
-		if (is_he)
-			phymode = WLAN_PHYMODE_11AXG_HE20;
-		else if (is_vht)
-			phymode = WLAN_PHYMODE_11AC_VHT20_2G;
-		else if (is_ht)
-			phymode = WLAN_PHYMODE_11NG_HT20;
-		else
+		if (is_vht) {
+			if (CH_WIDTH_80MHZ == ch_width)
+				phymode = WLAN_PHYMODE_11AC_VHT80;
+			else
+				phymode = (CH_WIDTH_40MHZ == ch_width) ?
+					  WLAN_PHYMODE_11AC_VHT40 :
+					  WLAN_PHYMODE_11AC_VHT20_2G;
+		} else if (is_ht) {
+			phymode = (CH_WIDTH_40MHZ == ch_width) ?
+				   WLAN_PHYMODE_11NG_HT40 :
+				   WLAN_PHYMODE_11NG_HT20;
+		} else
 			phymode = WLAN_PHYMODE_11B;
 	} else
 #endif /* FEATURE_WLAN_TDLS */
@@ -3930,6 +3928,103 @@ int wma_rcpi_event_handler(void *handle, uint8_t *cmd_param_info,
 
 	return 0;
 }
+
+#ifndef ROAM_OFFLOAD_V1
+/**
+ * wma_set_roam_offload_flag() -  Set roam offload flag to fw
+ * @wma:     wma handle
+ * @vdev_id: vdev id
+ * @is_set:  set or clear
+ *
+ * Return: none
+ */
+static void wma_set_roam_offload_flag(tp_wma_handle wma, uint8_t vdev_id,
+				      bool is_set)
+{
+	QDF_STATUS status;
+	uint32_t flag = 0;
+	bool disable_4way_hs_offload;
+	bool bmiss_skip_full_scan;
+
+	if (is_set) {
+		flag = WMI_ROAM_FW_OFFLOAD_ENABLE_FLAG |
+		       WMI_ROAM_BMISS_FINAL_SCAN_ENABLE_FLAG;
+
+		wlan_mlme_get_4way_hs_offload(wma->psoc,
+					      &disable_4way_hs_offload);
+		/*
+		 * If 4-way HS offload is disabled then let supplicant handle
+		 * 4way HS and firmware will still do LFR3.0 till reassoc phase.
+		 */
+		if (disable_4way_hs_offload)
+			flag |= WMI_VDEV_PARAM_SKIP_ROAM_EAPOL_4WAY_HANDSHAKE;
+
+		wlan_mlme_get_bmiss_skip_full_scan_value(wma->psoc,
+							 &bmiss_skip_full_scan);
+		/*
+		 * If WMI_ROAM_BMISS_FINAL_SCAN_ENABLE_FLAG is set, then
+		 * WMI_ROAM_BMISS_FINAL_SCAN_TYPE_FLAG decides whether firmware
+		 * does channel map based partial scan or partial scan followed
+		 * by full scan in case no candidate is found in partial scan.
+		 */
+		if (bmiss_skip_full_scan)
+			flag |= WMI_ROAM_BMISS_FINAL_SCAN_TYPE_FLAG;
+	}
+
+	wma_debug("vdev_id:%d, is_set:%d, flag:%d", vdev_id, is_set, flag);
+	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
+				    WMI_VDEV_PARAM_ROAM_FW_OFFLOAD, flag);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to set WMI_VDEV_PARAM_ROAM_FW_OFFLOAD");
+}
+
+void wma_update_roam_offload_flag(void *handle,
+				  struct roam_init_params *params)
+{
+	tp_wma_handle wma = handle;
+	struct wma_txrx_node *iface;
+
+	if (!wma_is_vdev_valid(params->vdev_id)) {
+		wma_err("vdev_id: %d is not active", params->vdev_id);
+		return;
+	}
+
+	iface = &wma->interfaces[params->vdev_id];
+
+	if ((iface->type != WMI_VDEV_TYPE_STA) ||
+	    (iface->sub_type != 0)) {
+		wma_err("this isn't a STA: %d", params->vdev_id);
+		return;
+	}
+
+	wma_set_roam_offload_flag(wma, params->vdev_id, params->enable);
+}
+
+void wma_set_roam_disable_cfg(void *handle, struct roam_disable_cfg *params)
+{
+	tp_wma_handle wma = handle;
+	struct wma_txrx_node *iface;
+	QDF_STATUS status;
+
+	if (!wma_is_vdev_valid(params->vdev_id)) {
+		wma_err("vdev_id: %d is not active", params->vdev_id);
+		return;
+	}
+
+	iface = &wma->interfaces[params->vdev_id];
+
+	if ((iface->type != WMI_VDEV_TYPE_STA) ||
+	    (iface->sub_type != 0)) {
+		wma_err("this isn't a STA: %d", params->vdev_id);
+		return;
+	}
+
+	status = wma_vdev_set_param(wma->wmi_handle, params->vdev_id,
+				    WMI_VDEV_PARAM_ROAM_11KV_CTRL, params->cfg);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to set WMI_VDEV_PARAM_ROAM_11KV_CTRL");
+}
+#endif
 
 QDF_STATUS wma_send_vdev_down_to_fw(t_wma_handle *wma, uint8_t vdev_id)
 {

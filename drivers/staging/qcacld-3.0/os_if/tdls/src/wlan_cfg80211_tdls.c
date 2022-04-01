@@ -35,7 +35,7 @@
 #include <wlan_reg_services_api.h>
 #include "wlan_cfg80211_mc_cp_stats.h"
 #include "sir_api.h"
-#include "wlan_tdls_ucfg_api.h"
+
 
 #define TDLS_MAX_NO_OF_2_4_CHANNELS 14
 
@@ -292,27 +292,7 @@ tdls_calc_channels_from_staparams(struct tdls_update_peer_params *req_info,
 }
 
 #ifdef WLAN_FEATURE_11AX
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-static void
-wlan_cfg80211_tdls_extract_6ghz_params(struct tdls_update_peer_params *req_info,
-				       struct station_parameters *params)
-{
-	if (!params->he_6ghz_capa) {
-		osif_debug("6 Ghz he_capa not present");
-		return;
-	}
-
-	qdf_mem_copy(&req_info->he_6ghz_cap, params->he_6ghz_capa,
-		     sizeof(params->he_6ghz_capa));
-}
-#else
-static void
-wlan_cfg80211_tdls_extract_6ghz_params(struct tdls_update_peer_params *req_info,
-				       struct station_parameters *params)
-{
-	osif_debug("kernel don't support tdls 6 ghz band");
-}
-#endif
+#define MIN_TDLS_HE_CAP_LEN 21
 
 static void
 wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
@@ -330,13 +310,8 @@ wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
 	}
 
 	req_info->he_cap_len = params->he_capa_len;
-	if (req_info->he_cap_len > MAX_TDLS_HE_CAP_LEN)
-		req_info->he_cap_len = MAX_TDLS_HE_CAP_LEN;
-
 	qdf_mem_copy(&req_info->he_cap, params->he_capa,
-		     req_info->he_cap_len);
-
-	wlan_cfg80211_tdls_extract_6ghz_params(req_info, params);
+		     sizeof(struct hecap));
 
 	return;
 }
@@ -351,8 +326,7 @@ wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
 
 static void
 wlan_cfg80211_tdls_extract_params(struct tdls_update_peer_params *req_info,
-				  struct station_parameters *params,
-				  bool tdls_11ax_support)
+				  struct station_parameters *params)
 {
 	int i;
 
@@ -433,10 +407,7 @@ wlan_cfg80211_tdls_extract_params(struct tdls_update_peer_params *req_info,
 		req_info->is_pmf = 1;
 	}
 
-	if (tdls_11ax_support)
-		wlan_cfg80211_tdls_extract_he_params(req_info, params);
-	else
-		osif_debug("tdls ax disabled");
+	wlan_cfg80211_tdls_extract_he_params(req_info, params);
 }
 
 int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
@@ -448,8 +419,6 @@ int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
 	struct vdev_osif_priv *osif_priv;
 	struct osif_tdls_vdev *tdls_priv;
 	unsigned long rc;
-	struct wlan_objmgr_psoc *psoc;
-	bool tdls_11ax_support = false;
 
 	status = wlan_cfg80211_tdls_validate_mac_addr(mac);
 
@@ -463,14 +432,7 @@ int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
 	if (!req_info)
 		return -EINVAL;
 
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		osif_err("Invalid psoc");
-		return -EINVAL;
-	}
-
-	tdls_11ax_support = ucfg_tdls_is_fw_11ax_capable(psoc);
-	wlan_cfg80211_tdls_extract_params(req_info, params, tdls_11ax_support);
+	wlan_cfg80211_tdls_extract_params(req_info, params);
 
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 	if (!osif_priv || !osif_priv->osif_tdls) {

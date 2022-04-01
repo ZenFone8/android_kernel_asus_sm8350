@@ -114,7 +114,6 @@
 #endif
 
 #include "wlan_pkt_capture_ucfg_api.h"
-#include "wlan_fwol_ucfg_api.h"
 
 #define WMA_LOG_COMPLETION_TIMER 3000 /* 3 seconds */
 #define WMI_TLV_HEADROOM 128
@@ -847,28 +846,6 @@ static void wma_set_dtim_period(tp_wma_handle wma,
 
 }
 
-static inline bool wma_is_tx_chainmask_valid(int value,
-					     struct target_psoc_info *tgt_hdl)
-{
-	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap;
-	uint8_t total_mac_phy_cnt, i;
-
-	mac_phy_cap = target_psoc_get_mac_phy_cap(tgt_hdl);
-	if (!mac_phy_cap) {
-		wma_err("Invalid MAC PHY capabilities handle");
-		return false;
-	}
-
-	total_mac_phy_cnt = target_psoc_get_total_mac_phy_cnt(tgt_hdl);
-	for (i = 0; i < total_mac_phy_cnt; i++) {
-		if (((mac_phy_cap[i].tx_chain_mask_5G) & (value))) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
 /**
  * wma_process_cli_set_cmd() - set parameters to fw
  * @wma: wma handle
@@ -936,14 +913,6 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					wma_check_txrx_chainmask(
 					target_if_get_num_rf_chains(tgt_hdl),
 					privcmd->param_value)) {
-				wma_debug("Chainmask value is invalid");
-				return;
-			}
-		}
-
-		if (privcmd->param_id == WMI_PDEV_PARAM_TX_CHAIN_MASK) {
-			if (!wma_is_tx_chainmask_valid(privcmd->param_value,
-						       tgt_hdl)) {
 				wma_debug("Chainmask value is invalid");
 				return;
 			}
@@ -1860,7 +1829,6 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 			"\tipv6_mcast_na %u\n"
 			"\toem_response %u\n"
 			"\tuc_drop %u\n"
-			"\tfatal_event %u\n"
 			"dtimPeriod %d\n"
 			"chan_width %d\n"
 			"vdev_active %d\n"
@@ -1887,7 +1855,6 @@ static void wma_state_info_dump(char **buf_ptr, uint16_t *size)
 			stats.ipv6_mcast_na_stats,
 			stats.oem_response_wake_up_count,
 			stats.uc_drop_wake_up_count,
-			stats.fatal_event_wake_up_count,
 			iface->dtimPeriod,
 			iface->chan_width,
 			iface->vdev_active,
@@ -2936,6 +2903,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	bool val = 0;
 	void *cds_context;
 	target_resource_config *wlan_res_cfg;
+	uint8_t delay_before_vdev_stop;
 	uint32_t self_gen_frm_pwr = 0;
 
 	wma_debug("Enter");
@@ -3111,9 +3079,13 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 		goto err_scn_context;
 	}
 
-	for (i = 0; i < wma_handle->max_bssid; ++i)
+	for (i = 0; i < wma_handle->max_bssid; ++i) {
 		wma_vdev_init(&wma_handle->interfaces[i]);
-
+		ucfg_mlme_get_delay_before_vdev_stop(wma_handle->psoc,
+						     &delay_before_vdev_stop);
+		wma_handle->interfaces[i].delay_before_vdev_stop =
+							delay_before_vdev_stop;
+	}
 	/* Register the debug print event handler */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					wmi_debug_print_event_id,
@@ -4603,59 +4575,6 @@ static void wma_set_tx_partition_base(uint32_t value)
 }
 #endif
 
-#ifdef WLAN_FEATURE_IGMP_OFFLOAD
-/**
- * wma_get_igmp_offload_enable() - update tgt service with igmp offload support
- * @wmi_handle: Unified wmi handle
- * @cfg: target services
- *
- * Return: none
- */
-static inline void
-wma_get_igmp_offload_enable(struct wmi_unified *wmi_handle,
-			    struct wma_tgt_services *cfg)
-{
-	cfg->igmp_offload_enable = wmi_service_enabled(
-					wmi_handle,
-					wmi_service_igmp_offload_support);
-}
-#else
-static inline void
-wma_get_igmp_offload_enable(struct wmi_unified *wmi_handle,
-			    struct wma_tgt_services *cfg)
-{}
-#endif
-
-#ifdef WLAN_FEATURE_11AX
-#ifdef FEATURE_WLAN_TDLS
-/**
- * wma_get_tdls_ax_support() - update tgt service with service tdls ax support
- * @wmi_handle: Unified wmi handle
- * @cfg: target services
- *
- * Return: none
- */
-static inline void
-wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
-			struct wma_tgt_services *cfg)
-{
-	cfg->en_tdls_11ax_support = wmi_service_enabled(
-						wmi_handle,
-						wmi_service_tdls_ax_support);
-}
-#else
-static inline void
-wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
-			struct wma_tgt_services *cfg)
-{}
-#endif
-#else
-static inline void
-wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
-			struct wma_tgt_services *cfg)
-{}
-#endif
-
 /**
  * wma_update_target_services() - update target services from wma handle
  * @wmi_handle: Unified wmi handle
@@ -4792,8 +4711,6 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 
 	wma_get_service_cap_club_get_sta_in_ll_stats_req(wmi_handle, cfg);
 
-	wma_get_igmp_offload_enable(wmi_handle, cfg);
-	wma_get_tdls_ax_support(wmi_handle, cfg);
 }
 
 /**
@@ -5477,12 +5394,7 @@ static void wma_update_mlme_related_tgt_caps(struct wlan_objmgr_psoc *psoc,
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_dual_sta_roam_support);
 
-	mlme_tgt_cfg.ocv_support =
-		wmi_service_enabled(wmi_handle,
-				    wmi_service_ocv_support);
-
-	wma_debug("beacon protection support %d, ocv support %d",
-		  mlme_tgt_cfg.bigtk_support, mlme_tgt_cfg.ocv_support);
+	wma_debug("beacon protection support %d", mlme_tgt_cfg.bigtk_support);
 
 	/* Call this at last only after filling all the tgt caps */
 	wlan_mlme_update_cfg_with_tgt_caps(psoc, &mlme_tgt_cfg);
@@ -5805,52 +5717,10 @@ static void wma_set_mlme_caps(struct wlan_objmgr_psoc *psoc)
 		wma_err("Failed to set sae roam support");
 }
 
-#ifdef THERMAL_STATS_SUPPORT
-static void wma_set_thermal_stats_fw_cap(tp_wma_handle wma,
-					 struct wlan_fwol_capability_info *cap)
-{
-	cap->fw_thermal_stats_cap = wmi_service_enabled(wma->wmi_handle,
-				wmi_service_thermal_stats_temp_range_supported);
-}
-#else
-static void wma_set_thermal_stats_fw_cap(tp_wma_handle wma,
-					 struct wlan_fwol_capability_info *cap)
-{
-}
-#endif
-
-/**
- * wma_set_fwol_caps() - Populate fwol component related capabilities
- *			 to the fwol component
- *
- * @psoc: Pointer to psoc object
- *
- * Return: None
- */
-static void wma_set_fwol_caps(struct wlan_objmgr_psoc *psoc)
-{
-	tp_wma_handle wma;
-	struct wlan_fwol_capability_info cap_info;
-	wma = cds_get_context(QDF_MODULE_ID_WMA);
-
-	if (!wma) {
-		wma_err_rl("wma Null");
-		return;
-	}
-	if (!psoc) {
-		wma_err_rl("psoc Null");
-		return;
-	}
-
-	wma_set_thermal_stats_fw_cap(wma, &cap_info);
-	ucfg_fwol_update_fw_cap_info(psoc, &cap_info);
-}
-
 static void wma_set_component_caps(struct wlan_objmgr_psoc *psoc)
 {
 	wma_set_pmo_caps(psoc);
 	wma_set_mlme_caps(psoc);
-	wma_set_fwol_caps(psoc);
 }
 
 #if defined(WLAN_FEATURE_GTK_OFFLOAD) && defined(WLAN_POWER_MANAGEMENT_OFFLOAD)
@@ -6990,12 +6860,6 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 	else
 		wlan_res_cfg->pktcapture_support = false;
 
-	if (wmi_service_enabled(wmi_handle,
-				wmi_service_sae_eapol_offload_support))
-		wlan_res_cfg->sae_eapol_offload = true;
-	else
-		wlan_res_cfg->sae_eapol_offload = false;
-
 	wma_debug("num_vdevs: %u", wlan_res_cfg->num_vdevs);
 
 	wma_init_dbr_params(wma_handle);
@@ -7056,6 +6920,52 @@ int wma_rx_ready_event(void *handle, uint8_t *cmd_param_info,
 	wma_debug("Exit");
 
 	return 0;
+}
+
+/**
+ * wma_setneedshutdown() - setting wma needshutdown flag
+ *
+ * Return: none
+ */
+void wma_setneedshutdown(void)
+{
+	tp_wma_handle wma_handle;
+
+	wma_debug("Enter");
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma_handle) {
+		wma_err("Invalid arguments");
+		QDF_ASSERT(0);
+		return;
+	}
+
+	wma_handle->needShutdown = true;
+	wma_debug("Exit");
+}
+
+/**
+ * wma_needshutdown() - Is wma needs shutdown?
+ *
+ * Return: returns true/false
+ */
+bool wma_needshutdown(void)
+{
+	tp_wma_handle wma_handle;
+
+	wma_debug("Enter");
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+
+	if (!wma_handle) {
+		wma_err("Invalid arguments");
+		QDF_ASSERT(0);
+		return false;
+	}
+
+	wma_debug("Exit");
+	return wma_handle->needShutdown;
 }
 
 /**
@@ -8655,7 +8565,12 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 				(tpSirRcvFltMcAddrList) msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-
+#ifndef ROAM_OFFLOAD_V1
+	/* this is temp will be removed once ROAM_OFFLOAD_V1 is enabled */
+	case WMA_ROAM_SCAN_OFFLOAD_REQ:
+		wma_process_roaming_config(wma_handle, msg->bodyptr);
+		break;
+#endif
 	case WMA_ROAM_PRE_AUTH_STATUS:
 		wma_send_roam_preauth_status(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
@@ -8822,6 +8737,13 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		qdf_mem_free(msg->bodyptr);
 		break;
 #endif /* FEATURE_WLAN_EXTSCAN */
+#ifndef ROAM_OFFLOAD_V1
+	case WMA_SET_PER_ROAM_CONFIG_CMD:
+		wma_update_per_roam_config(wma_handle,
+			(struct wlan_per_roam_config_req *)msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
+#endif
 	case WMA_SET_SCAN_MAC_OUI_REQ:
 		wma_scan_probe_setoui(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
@@ -9123,6 +9045,21 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 #ifdef WLAN_MWS_INFO_DEBUGFS
 	case WMA_GET_MWS_COEX_INFO_REQ:
 		wma_get_mws_coex_info_req(wma_handle, msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
+#endif
+#ifndef ROAM_OFFLOAD_V1
+	/* This code will be removed once ROAM_OFFLOAD_V1 is enabled */
+	case WMA_SET_ROAM_TRIGGERS:
+		wma_set_roam_triggers(wma_handle, msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
+	case WMA_ROAM_INIT_PARAM:
+		wma_update_roam_offload_flag(wma_handle, msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		break;
+	case WMA_ROAM_DISABLE_CFG:
+		wma_set_roam_disable_cfg(wma_handle, msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
 #endif

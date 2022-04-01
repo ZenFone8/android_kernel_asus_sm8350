@@ -94,9 +94,6 @@
  */
 #define AP_OFF_RSSI_OFFSET 20
 
-/* Default beacon interval of 100 ms */
-#define CUSTOM_CONC_GO_BI 100
-
 /**
  * struct mlme_cfg_str - generic structure for all mlme CFG string items
  *
@@ -935,6 +932,7 @@ struct wlan_mlme_vht_caps {
  * @sap_max_inactivity_override: Override updating ap_sta_inactivity from
  * hostapd.conf
  * @sap_uapsd_enabled: Flag to enable/disable UAPSD for SAP
+ * @reject_addba_req: Flag to decline ADDBA Req from SAP
  */
 struct wlan_mlme_qos {
 	uint32_t tx_aggregation_size;
@@ -955,6 +953,7 @@ struct wlan_mlme_qos {
 	uint32_t tx_non_aggr_sw_retry_threshold;
 	bool sap_max_inactivity_override;
 	bool sap_uapsd_enabled;
+	bool reject_addba_req;
 };
 
 #ifdef WLAN_FEATURE_11AX
@@ -1002,7 +1001,6 @@ struct wlan_mlme_chain_cfg {
  * supports stop all host scan request type.
  * @peer_create_conf_support: Peer create confirmation command support
  * @dual_sta_roam_fw_support: Firmware support for dual sta roaming feature
- * @ocv_support: FW supports OCV
  *
  * Add all the mlme-tgt related capablities here, and the public API would fill
  * the related capability in the required mlme cfg structure.
@@ -1013,7 +1011,6 @@ struct mlme_tgt_caps {
 	bool stop_all_host_scan_support;
 	bool peer_create_conf_support;
 	bool dual_sta_roam_fw_support;
-	bool ocv_support;
 };
 
 /**
@@ -1229,9 +1226,7 @@ struct wlan_mlme_ratemask {
  * @dual_sta_roam_fw_support: Firmware support for dual sta roaming feature
  * @sae_connect_retries: sae connect retry bitmask
  * @wls_6ghz_capable: wifi location service(WLS) is 6ghz capable
- * @enabled_rf_test_mode: Enable/disable the RF test mode config
  * @monitor_mode_concurrency: Monitor mode concurrency supported
- * @ocv_support: FW supports OCV or not
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1261,7 +1256,7 @@ struct wlan_mlme_generic {
 	bool enable_beacon_reception_stats;
 	bool enable_remove_time_stamp_sync_cmd;
 	bool data_stall_recovery_fw_support;
-	uint32_t disable_4way_hs_offload;
+	bool disable_4way_hs_offload;
 	bool as_enabled;
 	uint8_t mgmt_retry_max;
 	bool bmiss_skip_full_scan;
@@ -1273,9 +1268,7 @@ struct wlan_mlme_generic {
 	bool dual_sta_roam_fw_support;
 	uint32_t sae_connect_retries;
 	bool wls_6ghz_capable;
-	bool enabled_rf_test_mode;
 	enum monitor_mode_concurrency monitor_mode_concurrency;
-	bool ocv_support;
 };
 
 /*
@@ -1355,17 +1348,10 @@ struct wlan_mlme_acs {
  * @is_bcast_requestor_enabled: bcast requestor enable/disable
  * @bcast_requestor_tgt_cap: Broadcast requestor target capability
  * @bcast_responder_tgt_cap: Broadcast responder target capability
- * @bcast_legacy_tgt_cap: Broadcast Target capability. This is the legacy
- * capability.
  * @is_twt_nudge_tgt_cap_enabled: support for nudge request enable/disable
  * @is_all_twt_tgt_cap_enabled: support for all twt enable/disable
  * @is_twt_statistics_tgt_cap_enabled: support for twt statistics
  * @twt_congestion_timeout: congestion timeout value
- * @enable_twt_24ghz: Enable/disable host TWT when STA is connected in
- * 2.4Ghz
- * @req_flag: requestor flag enable/disable
- * @res_flag: responder flag enable/disable
- * @twt_res_svc_cap: responder service capability
  */
 struct wlan_mlme_cfg_twt {
 	bool is_twt_enabled;
@@ -1373,15 +1359,10 @@ struct wlan_mlme_cfg_twt {
 	bool is_bcast_requestor_enabled;
 	bool bcast_requestor_tgt_cap;
 	bool bcast_responder_tgt_cap;
-	bool bcast_legacy_tgt_cap;
 	bool is_twt_nudge_tgt_cap_enabled;
 	bool is_all_twt_tgt_cap_enabled;
 	bool is_twt_statistics_tgt_cap_enabled;
 	uint32_t twt_congestion_timeout;
-	bool enable_twt_24ghz;
-	bool req_flag;
-	bool res_flag;
-	bool twt_res_svc_cap;
 };
 
 /**
@@ -1396,7 +1377,6 @@ struct wlan_mlme_cfg_twt {
  * @is_override_ht20_40_24g: use channel bonding in 2.4 GHz
  * @obss_detection_offload_enabled:       Enable OBSS detection offload
  * @obss_color_collision_offload_enabled: Enable obss color collision
- * @bss_color_collision_det_sta: STA BSS color collision detection offload
  */
 struct wlan_mlme_obss_ht40 {
 	uint32_t active_dwelltime;
@@ -1409,7 +1389,6 @@ struct wlan_mlme_obss_ht40 {
 	bool is_override_ht20_40_24g;
 	bool obss_detection_offload_enabled;
 	bool obss_color_collision_offload_enabled;
-	bool bss_color_collision_det_sta;
 };
 
 /**
@@ -1585,7 +1564,6 @@ struct fw_scan_channels {
 /*
  * @mawc_roam_enabled:              Enable/Disable MAWC during roaming
  * @enable_fast_roam_in_concurrency:Enable LFR roaming on STA during concurrency
- * @vendor_btm_param:               Vendor WTC roam trigger parameters
  * @lfr3_roaming_offload:           Enable/disable roam offload feature
  * @lfr3_dual_sta_roaming_enabled:  Enable/Disable dual sta roaming offload
  * feature
@@ -1703,7 +1681,6 @@ struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
 	bool enable_fast_roam_in_concurrency;
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-	struct wlan_cm_roam_vendor_btm_params vendor_btm_param;
 	bool lfr3_roaming_offload;
 	bool lfr3_dual_sta_roaming_enabled;
 	bool enable_self_bss_roam;
@@ -2131,7 +2108,6 @@ struct wlan_mlme_power {
  * @ap_link_monitor_timeout: AP link monitor timeout value
  * @ps_data_inactivity_timeout: PS data inactivity timeout
  * @wmi_wq_watchdog_timeout: timeout period for wmi watchdog bite
- * @sae_auth_failure_timeout: SAE authentication failure timeout
  */
 struct wlan_mlme_timeout {
 	uint32_t join_failure_timeout;
@@ -2147,7 +2123,6 @@ struct wlan_mlme_timeout {
 	uint32_t ap_link_monitor_timeout;
 	uint32_t ps_data_inactivity_timeout;
 	uint32_t wmi_wq_watchdog_timeout;
-	uint32_t sae_auth_failure_timeout;
 };
 
 /**
@@ -2256,14 +2231,12 @@ struct wlan_mlme_btm {
 /**
  * struct wlan_mlme_fe_wlm - WLM related configs
  * @latency_enable: Flag to check if latency is enabled
- * @latency_reset: Flag to check if latency reset is enabled
  * @latency_level: WLM latency level
  * @latency_flags: WLM latency flags setting
  * @latency_host_flags: WLM latency host flags setting
  */
 struct wlan_mlme_fe_wlm {
 	bool latency_enable;
-	bool latency_reset;
 	uint8_t latency_level;
 	uint32_t latency_flags[MLME_NUM_WLM_LATENCY_LEVEL];
 	uint32_t latency_host_flags[MLME_NUM_WLM_LATENCY_LEVEL];
@@ -2333,7 +2306,6 @@ enum mlme_reg_srd_master_modes {
  * @enable_pending_chan_list_req: enables/disables scan channel
  * list command to FW till the current scan is complete.
  * @retain_nol_across_regdmn_update: Retain the NOL list across the regdomain.
- * @enable_nan_on_indoor_channels: Enable nan on Indoor channels
  */
 struct wlan_mlme_reg {
 	uint32_t self_gen_frm_pwr;
@@ -2353,7 +2325,6 @@ struct wlan_mlme_reg {
 	bool ignore_fw_reg_offload_ind;
 	bool enable_pending_chan_list_req;
 	bool retain_nol_across_regdmn_update;
-	bool enable_nan_on_indoor_channels;
 };
 
 /**
@@ -2504,21 +2475,4 @@ struct wlan_ies {
 	uint16_t len;
 	uint8_t *data;
 };
-
-/**
- * struct wlan_change_bi - Message struct to update beacon interval
- * @message_type: type of message
- * @length: length of message
- * @beacon_interval: beacon interval to update to (seconds)
- * @bssid: BSSID of vdev
- * @session_id: session ID of vdev
- */
-struct wlan_change_bi {
-	uint16_t message_type;
-	uint16_t length;
-	uint16_t beacon_interval;
-	struct qdf_mac_addr bssid;
-	uint8_t session_id;
-};
-
 #endif

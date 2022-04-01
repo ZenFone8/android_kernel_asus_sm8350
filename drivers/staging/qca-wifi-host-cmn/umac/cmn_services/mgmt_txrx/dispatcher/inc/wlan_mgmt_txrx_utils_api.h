@@ -600,7 +600,6 @@ struct action_frm_hdr {
  * @MGMT_ACTION_MCSC_REQ: MCSC request frame
  * @MGMT_ACTION_MCSC_RSP: MCSC response frame
  * @MGMT_FRAME_TYPE_ALL:         mgmt frame type for all type of frames
- * @MGMT_CTRL_FRAME: Control Frames
  * @MGMT_MAX_FRAME_TYPE:         max. mgmt frame types
  */
 enum mgmt_frame_type {
@@ -725,7 +724,6 @@ enum mgmt_frame_type {
 	MGMT_ACTION_MCSC_REQ,
 	MGMT_ACTION_MCSC_RSP,
 	MGMT_FRAME_TYPE_ALL,
-	MGMT_CTRL_FRAME,
 	MGMT_MAX_FRAME_TYPE,
 };
 
@@ -763,7 +761,6 @@ struct mgmt_rx_event_params {
 	uint32_t    flags;
 	int32_t     rssi;
 	uint32_t    tsf_delta;
-	uint32_t    tsf_l32;
 	uint8_t     pdev_id;
 	void        *rx_params;
 };

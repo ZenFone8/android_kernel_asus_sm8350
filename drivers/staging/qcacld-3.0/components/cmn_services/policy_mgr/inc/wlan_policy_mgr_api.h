@@ -1465,8 +1465,6 @@ struct policy_mgr_sme_cbacks {
  * @wlan_hdd_set_sap_csa_reason: Set the sap csa reason in cases like NAN.
  * @hdd_get_ap_6ghz_capable: get ap vdev 6ghz capable info from hdd ap adapter.
  * @wlan_hdd_indicate_active_ndp_cnt: indicate active ndp cnt to hdd
- * @wlan_get_ap_prefer_conc_ch_params: get prefer ap channel bw parameters
- *  based on target channel frequency and concurrent connections.
  */
 struct policy_mgr_hdd_cbacks {
 	void (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
@@ -1488,24 +1486,8 @@ struct policy_mgr_hdd_cbacks {
 					    uint8_t vdev_id);
 	void (*wlan_hdd_indicate_active_ndp_cnt)(struct wlan_objmgr_psoc *psoc,
 						 uint8_t vdev_id, uint8_t cnt);
-	QDF_STATUS (*wlan_get_ap_prefer_conc_ch_params)(
-			struct wlan_objmgr_psoc *psoc,
-			uint8_t vdev_id, uint32_t chan_freq,
-			struct ch_params *ch_params);
 };
 
-/**
- * struct policy_mgr_conc_cbacks - lim Callbacks to be invoked
- * from policy manager
- * @connection_info_update: check and update params based on STA/SAP
- *                          concurrency.such as EDCA params and RTS threshold.
- *                          If updated, it will also send the updated parameters
- *                          to FW.
- */
-
-struct policy_mgr_conc_cbacks {
-	void (*connection_info_update)(void);
-};
 
 /**
  * struct policy_mgr_tdls_cbacks - TDLS Callbacks to be invoked
@@ -1654,20 +1636,6 @@ void policy_mgr_set_dual_mac_scan_config(struct wlan_objmgr_psoc *psoc,
  */
 void policy_mgr_set_dual_mac_fw_mode_config(struct wlan_objmgr_psoc *psoc,
 		uint8_t dbs, uint8_t dfs);
-
-/**
- * policy_mgr_is_scc_with_this_vdev_id() - Check if this vdev_id has SCC with
- * other vdev_id's
- * @psoc: PSOC object information
- * @vdev_id: vdev_id
- *
- * This function checks if the given vdev_id has SCC with any other vdev's
- * or not.
- *
- * Return: true if SCC exists, false otherwise
- */
-bool policy_mgr_is_scc_with_this_vdev_id(struct wlan_objmgr_psoc *psoc,
-					 uint8_t vdev_id);
 
 /**
  * policy_mgr_soc_set_dual_mac_cfg_cb() - Callback for set dual mac config
@@ -2339,16 +2307,6 @@ void policy_mgr_hw_mode_transition_cb(uint32_t old_hw_mode_index,
 		struct wlan_objmgr_psoc *context);
 
 /**
- * policy_mgr_current_concurrency_is_scc() - To check the current
- * concurrency combination if it is doing SCC
- * @psoc: PSOC object information
- * This routine is called to check if it is doing SCC
- *
- * Return: True - SCC, False - Otherwise
- */
-bool policy_mgr_current_concurrency_is_scc(struct wlan_objmgr_psoc *psoc);
-
-/**
  * policy_mgr_current_concurrency_is_mcc() - To check the current
  * concurrency combination if it is doing MCC
  * @psoc: PSOC object information
@@ -2408,21 +2366,6 @@ QDF_STATUS policy_mgr_register_hdd_cb(struct wlan_objmgr_psoc *psoc,
  *         Failure (if de-registration fails)
  */
 QDF_STATUS policy_mgr_deregister_hdd_cb(struct wlan_objmgr_psoc *psoc);
-
-/**
- * policy_mgr_register_conc_cb() - register Lim callbacks
- * @psoc: PSOC object information
- * @hdd_cbacks: function pointers from lim
- *
- * API, allows Lim to register callbacks to be invoked by policy
- * mgr
- *
- * Return: SUCCESS,
- *         Failure (if registration fails)
- */
-
-QDF_STATUS policy_mgr_register_conc_cb(struct wlan_objmgr_psoc *psoc,
-				struct policy_mgr_conc_cbacks *conc_cbacks);
 
 /**
  * policy_mgr_register_tdls_cb() - register TDLS callbacks
@@ -3095,22 +3038,6 @@ QDF_STATUS policy_mgr_valid_sap_conc_channel_check(
 	struct ch_params *ch_params);
 
 /**
- * policy_mgr_sap_allowed_on_indoor_freq() - Check whether STA+SAP concurrency
- * allowed on indoor channel or not
- * @psoc: pointer to PSOC object information
- * @pdev: pointer to PDEV object information
- * @sap_ch_freq: initial channel frequency for SAP
- *
- * This function checks whether SAP is allowed to turn on in case of STA+SAP
- * concurrency if STA is on indoor channel.
- *
- * Return: false if SAP not allowed to come up on a indoor channel
- */
-bool policy_mgr_sap_allowed_on_indoor_freq(struct wlan_objmgr_psoc *psoc,
-					   struct wlan_objmgr_pdev *pdev,
-					   uint32_t sap_ch_freq);
-
-/**
  * policy_mgr_get_alternate_channel_for_sap() - Get an alternate
  * channel to move the SAP to
  * @psoc: PSOC object information
@@ -3253,18 +3180,18 @@ void policy_mgr_set_weight_of_dfs_passive_channels_to_zero(
 		struct wlan_objmgr_psoc *psoc, uint32_t *pcl,
 		uint32_t *len, uint8_t *weight_list, uint32_t weight_len);
 /**
- * policy_mgr_is_sap_allowed_on_dfs_freq() - check if sap allowed on dfs freq
+ * policy_mgr_is_sap_allowed_on_dfs_chan() - check if sap allowed on dfs channel
  * @pdev: id of objmgr pdev
  * @vdev_id: vdev id
- * @ch_freq: channel freq
+ * @channel: channel number
  * This function is used to check if sta_sap_scc_on_dfs_chan ini is set,
  * DFS master capability is assumed disabled in the driver.
  *
- * Return: true if sap is allowed on dfs freq,
+ * Return: true if sap is allowed on dfs channel,
  * otherwise false
  */
-bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
-					   uint8_t vdev_id, qdf_freq_t ch_freq);
+bool policy_mgr_is_sap_allowed_on_dfs_chan(struct wlan_objmgr_pdev *pdev,
+					   uint8_t vdev_id, uint8_t channel);
 /**
  * policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan() - check if sta+sap scc
  * allowed on dfs chan
@@ -3515,7 +3442,7 @@ QDF_STATUS policy_mgr_get_hw_mode_from_idx(
  * @psoc: Pointer to soc
  * @mode: new connection mode
  *
- * Current PORed 6ghz connection modes are STA, SAP, P2P.
+ * Current PORed 6ghz connection modes are STA, SAP.
  *
  * Return: true if supports else false.
  */

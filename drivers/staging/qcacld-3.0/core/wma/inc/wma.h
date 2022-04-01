@@ -683,6 +683,7 @@ struct wma_invalid_peer_params {
  * @roam_synch_in_progress: flag is in progress or not
  * @plink_status_req: link status request
  * @psnr_req: snr request
+ * @delay_before_vdev_stop: delay
  * @tx_streams: number of tx streams can be used by the vdev
  * @mac_id: the mac on which vdev is on
  * @arp_offload_req: cached arp offload request
@@ -727,6 +728,7 @@ struct wma_txrx_node {
 	uint32_t peer_count;
 	void *plink_status_req;
 	void *psnr_req;
+	uint8_t delay_before_vdev_stop;
 #ifdef FEATURE_WLAN_EXTSCAN
 	bool extscan_in_progress;
 #endif
@@ -825,6 +827,7 @@ struct wma_wlm_stats_data {
  * @last_umac_data_ota_timestamp: timestamp when OTA of last umac data
  *   was done
  * @last_umac_data_nbuf: cache nbuf ptr for the last umac data buf
+ * @needShutdown: is shutdown needed or not
  * @tgt_cfg_update_cb: configuration update callback
  * @reg_cap: regulatory capablities
  * @scan_id: scan id
@@ -946,6 +949,7 @@ typedef struct {
 	wma_tx_ota_comp_callback umac_data_ota_ack_cb;
 	unsigned long last_umac_data_ota_timestamp;
 	qdf_nbuf_t last_umac_data_nbuf;
+	bool needShutdown;
 	wma_tgt_cfg_cb tgt_cfg_update_cb;
 	HAL_REG_CAPABILITIES reg_cap;
 	uint32_t scan_id;
@@ -2064,6 +2068,19 @@ void wma_vdev_clear_pause_bit(uint8_t vdev_id, wmi_tx_pause_type bit_pos)
 	iface->pause_bitmap &= ~(1 << bit_pos);
 }
 
+#ifndef ROAM_OFFLOAD_V1
+/**
+ * wma_process_roaming_config() - process roam request
+ * @wma_handle: wma handle
+ * @roam_req: roam request parameters
+ *
+ * Main routine to handle ROAM commands coming from CSR module.
+ *
+ * Return: QDF status
+ */
+QDF_STATUS wma_process_roaming_config(tp_wma_handle wma_handle,
+				     struct roam_offload_scan_req *roam_req);
+#endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wma_send_roam_preauth_status() - Send the preauth status to wmi
@@ -2331,15 +2348,13 @@ uint8_t wma_rx_invalid_peer_ind(uint8_t vdev_id, void *wh);
  * @peer_macaddr: peer mac address
  * @tid: tid of rx
  * @reason_code: reason code
- * @cdp_rcode: CDP reason code for sending DELBA
  *
  * Return: 0 for success or non-zero on failure
  */
 int wma_dp_send_delba_ind(uint8_t vdev_id,
 			  uint8_t *peer_macaddr,
 			  uint8_t tid,
-			  uint8_t reason_code,
-			  enum cdp_delba_rcode cdp_rcode);
+			  uint8_t reason_code);
 
 /**
  * is_roam_inprogress() - Is vdev in progress
@@ -2414,14 +2429,10 @@ int wma_motion_det_base_line_host_event_handler(void *handle, u_int8_t *event,
  * @vdev_id: vdev id
  * @bssid: AP bssid
  * @roam_sync: if roam sync is in progress
- * @is_resp_required: Peer create response is expected from firmware.
- * This flag will be set to true for initial connection and false for
- * LFR2 case.
  *
  * Return: 0 on success, else error on failure
  */
-QDF_STATUS wma_add_bss_peer_sta(uint8_t vdev_id, uint8_t *bssid,
-				bool is_resp_required);
+QDF_STATUS wma_add_bss_peer_sta(uint8_t vdev_id, uint8_t *bssid);
 
 /**
  * wma_send_vdev_stop() - WMA api to send vdev stop to fw

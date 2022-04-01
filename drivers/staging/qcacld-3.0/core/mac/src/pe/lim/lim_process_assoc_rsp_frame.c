@@ -222,10 +222,6 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 		if (assoc_rsp->edcaPresent) {
 			QDF_STATUS status;
 
-			qdf_mem_copy(&sta_ds->qos.peer_edca_params,
-				     &assoc_rsp->edca,
-				     sizeof(assoc_rsp->edca));
-
 			status =
 				sch_beacon_edca_process(mac_ctx,
 					&assoc_rsp->edca, session_entry);
@@ -245,10 +241,6 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	sta_ds->wsmEnabled = 0;
 	if (session_entry->limWmeEnabled && assoc_rsp->wmeEdcaPresent) {
 		QDF_STATUS status;
-
-		qdf_mem_copy(&sta_ds->qos.peer_edca_params,
-			     &assoc_rsp->edca,
-			     sizeof(assoc_rsp->edca));
 
 		status = sch_beacon_edca_process(mac_ctx, &assoc_rsp->edca,
 				session_entry);
@@ -671,11 +663,11 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		return;
 	}
 
-	pe_nofl_rl_info("Assoc rsp RX: subtype %d vdev %d sys role %d lim state %d rssi %d from " QDF_MAC_ADDR_FMT,
-			subtype, vdev_id,
-			GET_LIM_SYSTEM_ROLE(session_entry),
-			session_entry->limMlmState, rssi,
-			QDF_MAC_ADDR_REF(hdr->sa));
+	pe_nofl_info("Assoc rsp RX: subtype %d vdev %d sys role %d lim state %d rssi %d from " QDF_MAC_ADDR_FMT,
+		     subtype, vdev_id,
+		     GET_LIM_SYSTEM_ROLE(session_entry),
+		     session_entry->limMlmState, rssi,
+		     QDF_MAC_ADDR_REF(hdr->sa));
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 			   (uint8_t *)hdr, frame_len + SIR_MAC_HDR_LEN_3A);
 

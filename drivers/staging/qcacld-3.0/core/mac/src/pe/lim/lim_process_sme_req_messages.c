@@ -1082,18 +1082,6 @@ static QDF_STATUS lim_send_join_req(struct pe_session *session,
 {
 	QDF_STATUS status;
 
-	/* Continue connect only if Vdev is in INIT state */
-	status = wlan_vdev_mlme_is_init_state(session->vdev);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("Vdev %d not in int state cur state %d substate %d",
-			session->vdev_id,
-			wlan_vdev_mlme_get_state(session->vdev),
-			wlan_vdev_mlme_get_substate(session->vdev));
-		qdf_trigger_self_recovery(session->mac_ctx->psoc,
-					  QDF_VDEV_SM_OUT_OF_SYNC);
-		return status;
-	}
-
 	status = mlme_set_assoc_type(session->vdev, VDEV_ASSOC);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
@@ -1287,9 +1275,6 @@ __lim_process_sme_join_req(struct mac_context *mac_ctx, void *msg_buf)
 				session_id,
 				QDF_MAC_ADDR_REF(bss_desc->bssId),
 				session->limSmeState);
-
-			qdf_trigger_self_recovery(mac_ctx->psoc,
-						  QDF_VDEV_SM_OUT_OF_SYNC);
 
 			if (session->limSmeState == eLIM_SME_LINK_EST_STATE &&
 			    session->smeSessionId == sme_join_req->vdev_id) {
@@ -1698,7 +1683,7 @@ static uint8_t lim_get_num_tpe_octets(uint8_t max_transmit_power_count)
 	if (!max_transmit_power_count)
 		return max_transmit_power_count;
 
-	return 1 << (max_transmit_power_count - 1);
+	return 1 << (max_transmit_power_count);
 }
 
 void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
@@ -1972,9 +1957,7 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
 
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session,
-		       bool is_pwr_constraint_absolute,
-		       uint8_t ap_pwr_type,
-		       bool ctry_code_match)
+		       bool is_pwr_constraint_absolute)
 {
 	bool is_psd_power = false;
 	bool is_tpe_present = false, is_6ghz_freq = false;
@@ -1986,7 +1969,6 @@ void lim_calculate_tpc(struct mac_context *mac,
 	qdf_freq_t oper_freq, start_freq = 0;
 	struct ch_params ch_params;
 	struct vdev_mlme_obj *mlme_obj;
-	uint8_t tpe_power;
 	bool skip_tpe = false;
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
@@ -2014,18 +1996,6 @@ void lim_calculate_tpc(struct mac_context *mac,
 	} else {
 		is_6ghz_freq = true;
 		is_psd_power = wlan_reg_is_6g_psd_power(mac->pdev);
-		/* Power mode calculation for 6G*/
-		ap_power_type_6g = session->ap_power_type;
-		if (LIM_IS_STA_ROLE(session)) {
-			if (!session->lim_join_req) {
-				if (!ctry_code_match)
-					ap_power_type_6g = ap_pwr_type;
-			} else {
-				if (!session->lim_join_req->same_ctry_code)
-					ap_power_type_6g =
-					session->lim_join_req->ap_power_type_6g;
-			}
-		}
 	}
 
 	if (mlme_obj->reg_tpc_obj.num_pwr_levels) {
@@ -2041,10 +2011,11 @@ void lim_calculate_tpc(struct mac_context *mac,
 	for (i = 0; i < num_pwr_levels; i++) {
 		if (is_tpe_present) {
 			if (is_6ghz_freq) {
-				wlan_reg_get_client_power_for_connecting_ap(
-				mac->pdev, ap_power_type_6g,
-				mlme_obj->reg_tpc_obj.frequency[i],
-				&is_psd_power, &reg_max, &psd_power);
+				ap_power_type_6g = session->ap_power_type;
+				wlan_reg_get_client_power_for_connecting_ap
+				(mac->pdev, ap_power_type_6g,
+				 mlme_obj->reg_tpc_obj.frequency[i],
+				 &is_psd_power, &reg_max, &psd_power);
 			}
 		} else {
 			/* center frequency calculation */
@@ -2052,8 +2023,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 				mlme_obj->reg_tpc_obj.frequency[i] =
 						start_freq + (20 * i);
 			} else {
-				wlan_reg_set_channel_params_for_freq(
-					mac->pdev, oper_freq, 0, &ch_params);
+				wlan_reg_set_channel_params_for_freq
+					(mac->pdev, oper_freq, 0, &ch_params);
 				mlme_obj->reg_tpc_obj.frequency[i] =
 					ch_params.mhz_freq_seg0;
 				ch_params.ch_width =
@@ -2061,19 +2032,17 @@ void lim_calculate_tpc(struct mac_context *mac,
 			}
 			if (is_6ghz_freq) {
 				if (LIM_IS_STA_ROLE(session)) {
+					ap_power_type_6g =
+							session->ap_power_type;
 					wlan_reg_get_client_power_for_connecting_ap
 					(mac->pdev, ap_power_type_6g,
 					 mlme_obj->reg_tpc_obj.frequency[i],
 					 &is_psd_power, &reg_max, &psd_power);
 				} else {
-					ap_power_type_6g =
-						wlan_reg_get_cur_6g_ap_pwr_type(
-							mac->pdev,
-							&ap_power_type_6g);
-					wlan_reg_get_6g_chan_ap_power(
-					mac->pdev,
-					mlme_obj->reg_tpc_obj.frequency[i],
-					&is_psd_power, &reg_max, &psd_power);
+					wlan_reg_get_6g_chan_ap_power
+					(mac->pdev,
+					 mlme_obj->reg_tpc_obj.frequency[i],
+					 &is_psd_power, &reg_max, &psd_power);
 				}
 			}
 		}
@@ -2096,12 +2065,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 		}
 		/* If TPE is present */
 		if (is_tpe_present && !skip_tpe) {
-			if (!is_psd_power && mlme_obj->reg_tpc_obj.eirp_power)
-				tpe_power =  mlme_obj->reg_tpc_obj.eirp_power;
-			else
-				tpe_power = mlme_obj->reg_tpc_obj.tpe[i];
-			max_tx_power = QDF_MIN(max_tx_power, (int8_t)tpe_power);
-			pe_debug("TPE: %d", tpe_power);
+			max_tx_power = QDF_MIN(max_tx_power, (int8_t)
+					       mlme_obj->reg_tpc_obj.tpe[i]);
+			pe_debug("TPE: %d", mlme_obj->reg_tpc_obj.tpe[i]);
 		}
 
 		/** If firmware updated max tx power is non zero,
@@ -3773,9 +3739,9 @@ static void lim_process_sme_set_addba_accept(struct mac_context *mac_ctx,
 		return;
 	}
 	if (!msg->addba_accept)
-		mac_ctx->reject_addba_req = 1;
+		mac_ctx->mlme_cfg->qos_mlme_params.reject_addba_req = 1;
 	else
-		mac_ctx->reject_addba_req = 0;
+		mac_ctx->mlme_cfg->qos_mlme_params.reject_addba_req = 0;
 }
 
 static void lim_process_sme_update_edca_params(struct mac_context *mac_ctx,
@@ -4091,7 +4057,7 @@ static void __lim_process_sme_session_update(struct mac_context *mac_ctx,
 static void __lim_process_sme_change_bi(struct mac_context *mac,
 					uint32_t *msg_buf)
 {
-	struct wlan_change_bi *pChangeBIParams;
+	struct change_bi_params *pChangeBIParams;
 	struct pe_session *pe_session;
 	uint8_t sessionId = 0;
 	tUpdateBeaconParams beaconParams;
@@ -4104,7 +4070,7 @@ static void __lim_process_sme_change_bi(struct mac_context *mac,
 	}
 
 	qdf_mem_zero(&beaconParams, sizeof(tUpdateBeaconParams));
-	pChangeBIParams = (struct wlan_change_bi *)msg_buf;
+	pChangeBIParams = (struct change_bi_params *)msg_buf;
 
 	pe_session = pe_find_session_by_bssid(mac,
 				pChangeBIParams->bssid.bytes,
@@ -4116,19 +4082,19 @@ static void __lim_process_sme_change_bi(struct mac_context *mac,
 
 	/*Update pe_session Beacon Interval */
 	if (pe_session->beaconParams.beaconInterval !=
-	    pChangeBIParams->beacon_interval) {
+	    pChangeBIParams->beaconInterval) {
 		pe_session->beaconParams.beaconInterval =
-			pChangeBIParams->beacon_interval;
+			pChangeBIParams->beaconInterval;
 	}
 
 	/*Update sch beaconInterval */
 	if (mac->sch.beacon_interval !=
-	    pChangeBIParams->beacon_interval) {
+	    pChangeBIParams->beaconInterval) {
 		mac->sch.beacon_interval =
-			pChangeBIParams->beacon_interval;
+			pChangeBIParams->beaconInterval;
 
 		pe_debug("LIM send update BeaconInterval Indication: %d",
-			pChangeBIParams->beacon_interval);
+			pChangeBIParams->beaconInterval);
 
 		if (false == mac->sap.SapDfsInfo.is_dfs_cac_timer_running) {
 			/* Update beacon */
@@ -4137,7 +4103,7 @@ static void __lim_process_sme_change_bi(struct mac_context *mac,
 			beaconParams.bss_idx = pe_session->vdev_id;
 			/* Set change in beacon Interval */
 			beaconParams.beaconInterval =
-				pChangeBIParams->beacon_interval;
+				pChangeBIParams->beaconInterval;
 			beaconParams.paramChangeBitmap =
 				PARAM_BCN_INTERVAL_CHANGED;
 			lim_send_beacon_params(mac, &beaconParams, pe_session);

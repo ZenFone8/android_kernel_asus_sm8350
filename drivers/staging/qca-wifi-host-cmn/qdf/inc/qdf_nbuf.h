@@ -254,9 +254,6 @@
  * @tx_status: packet tx status
  * @tx_retry_cnt: tx retry count
  * @add_rtap_ext: add radio tap extension
- * @start_seq: starting sequence number
- * @ba_bitmap: 256 bit block ack bitmap
- * @add_rtap_ext2: add radiotap extension2
  */
 struct mon_rx_status {
 	uint64_t tsft;
@@ -341,9 +338,6 @@ struct mon_rx_status {
 	uint8_t  tx_status;
 	uint8_t  tx_retry_cnt;
 	bool add_rtap_ext;
-	uint16_t start_seq;
-	uint32_t ba_bitmap[8];
-	bool add_rtap_ext2;
 };
 
 /**
@@ -438,23 +432,6 @@ struct qdf_radiotap_vendor_ns_ath {
 	uint32_t device_id;
 	uint32_t lsig_b;
 	uint32_t ppdu_start_timestamp;
-} __attribute__((__packed__));
-
-/**
- * struct qdf_radiotap_ext2 - radiotap ext2 fields
- * ppdu_id: ppdu_id of current msdu
- * prev_ppdu_id: ppdu_id of previous msdu
- * tid: tid number of previous msdu
- * start_seq: start sequence of previous msdu
- * ba_bitmap: block ack bitmap of previous msdu
- */
-struct qdf_radiotap_ext2 {
-	uint32_t ppdu_id;
-	uint32_t prev_ppdu_id;
-	uint16_t tid:8,
-		 reserved:8;
-	uint16_t start_seq;
-	uint32_t ba_bitmap[8];
 } __attribute__((__packed__));
 
 #define QDF_MEM_FUNC_NAME_SIZE 48
@@ -3990,20 +3967,6 @@ static inline void qdf_net_buf_debug_release_frag(qdf_nbuf_t buf,
 {
 }
 #endif /* NBUF_FRAG_MEMORY_DEBUG */
-
-#ifdef NBUF_MEMORY_DEBUG
-/**
- * qdf_set_smmu_fault_state() - Set smmu fault sate
- * @smmu_fault_state: state of the wlan smmy
- *
- * Return: void
- */
-void qdf_set_smmu_fault_state(bool smmu_fault_state);
-#else
-static inline void qdf_set_smmu_fault_state(bool smmu_fault_state)
-{
-}
-#endif
 
 #ifdef MEMORY_DEBUG
 /**

@@ -27,6 +27,7 @@
 #include "wlan_crypto_global_api.h"
 #include "wlan_mlme_main.h"
 
+#if defined(WLAN_FEATURE_ROAM_OFFLOAD) || defined(ROAM_OFFLOAD_V1)
 static struct wmi_unified
 *target_if_cm_roam_get_wmi_handle_from_vdev(struct wlan_objmgr_vdev *vdev)
 {
@@ -47,6 +48,7 @@ static struct wmi_unified
 
 	return wmi_handle;
 }
+#endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
@@ -85,6 +87,7 @@ target_if_cm_roam_register_lfr3_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 {}
 #endif
 
+#ifdef ROAM_OFFLOAD_V1
 /**
  * target_if_is_vdev_valid - vdev id is valid or not
  * @vdev_id: vdev id
@@ -754,10 +757,6 @@ target_if_get_wmi_roam_offload_flag(uint32_t flag)
 	if (flag & WLAN_ROAM_BMISS_FINAL_SCAN_TYPE)
 		roam_offload_flag |= WMI_ROAM_BMISS_FINAL_SCAN_TYPE_FLAG;
 
-	if (flag & WLAN_ROAM_SKIP_SAE_ROAM_4WAY_HANDSHAKE)
-		roam_offload_flag |=
-			WMI_VDEV_PARAM_SKIP_SAE_ROAM_4WAY_HANDSHAKE;
-
 	return roam_offload_flag;
 }
 
@@ -1296,6 +1295,12 @@ target_if_cm_roam_register_rso_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 	tx_ops->send_roam_disable_config =
 					target_if_cm_roam_send_disable_config;
 }
+#else
+static void
+target_if_cm_roam_register_rso_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
+{
+}
+#endif
 
 QDF_STATUS target_if_cm_roam_register_tx_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 {

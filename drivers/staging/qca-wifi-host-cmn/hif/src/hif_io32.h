@@ -22,7 +22,6 @@
 #include <linux/io.h>
 #include "hif.h"
 #include "hif_main.h"
-#include "pld_common.h"
 
 #if defined(HIF_REG_WINDOW_SUPPORT) && defined(HIF_PCI)
 

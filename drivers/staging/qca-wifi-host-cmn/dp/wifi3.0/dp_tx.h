@@ -38,8 +38,6 @@
 #define DP_TX_DESC_FLAG_TDLS_FRAME	0x100
 #define DP_TX_DESC_FLAG_ALLOCATED	0x200
 #define DP_TX_DESC_FLAG_MESH_MODE	0x400
-#define DP_TX_DESC_FLAG_TX_COMP_ERR	0x1000
-#define DP_TX_DESC_FLAG_FLUSH		0x2000
 
 #define DP_TX_EXT_DESC_FLAG_METADATA_VALID 0x1
 
@@ -145,6 +143,7 @@ struct dp_tx_queue {
  * @exception_fw: Duplicate frame to be sent to firmware
  * @ppdu_cookie: 16-bit ppdu_cookie that has to be replayed back in completions
  * @ix_tx_sniffer: Indicates if the packet has to be sniffed
+ * @send_to_fw: Send the packet to FW, without HTT meta data
  *
  * This structure holds the complete MSDU information needed to program the
  * Hardware TCL and MSDU extension descriptors for different frame types
@@ -166,6 +165,7 @@ struct dp_tx_msdu_info_s {
 	uint16_t ppdu_cookie;
 	uint16_t ast_idx;
 	uint16_t ast_hash;
+	uint8_t send_to_fw;
 };
 
 /**

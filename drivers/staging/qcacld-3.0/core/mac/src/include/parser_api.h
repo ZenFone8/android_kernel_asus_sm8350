@@ -206,7 +206,6 @@ enum operating_class_num {
 
 enum operating_extension_identifier {
 	OP_CLASS_ID_200 = 200,
-	OP_CLASS_ID_201,
 };
 
 /* Structure common to Beacons & Probe Responses */
@@ -738,7 +737,7 @@ populate_dot11f_country(struct mac_context *mac,
 /* Populated a populate_dot11f_ds_params */
 QDF_STATUS
 populate_dot11f_ds_params(struct mac_context *mac,
-			tDot11fIEDSParams *pDot11f, qdf_freq_t freq);
+			tDot11fIEDSParams *pDot11f, uint8_t channel);
 
 /* / Populated a tDot11fIEEDCAParamSet */
 void
@@ -1254,20 +1253,6 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-
-/**
- * populate_dot11f_btm_extended_caps() - populate btm extended capabilities
- * @mac_ctx: Global MAC context.
- * @pe_session: Pointer to the PE session.
- * @dot11f: Pointer to the extended capabilities of the session.
- *
- * Disable btm for SAE types for Helium firmware limit
- *
- * Return: QDF_STATUS Success or Failure
- */
-QDF_STATUS populate_dot11f_btm_extended_caps(struct mac_context *mac_ctx,
-					     struct pe_session *pe_session,
-					     struct sDot11fIEExtCap *dot11f);
 
 /**
  * lim_truncate_ppet: truncates ppet of trailling zeros

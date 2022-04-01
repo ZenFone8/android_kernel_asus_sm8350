@@ -1067,8 +1067,7 @@ bool cam_ife_csid_is_resolution_supported_by_fuse(uint32_t width)
 
 	switch (hw_version) {
 	case CAM_CPAS_TITAN_570_V200:
-		cam_cpas_is_feature_supported(CAM_CPAS_MP_LIMIT_FUSE,
-			CAM_CPAS_HW_IDX_ANY, &fuse_val);
+		cam_cpas_is_feature_supported(CAM_CPAS_MP_LIMIT_FUSE,CAM_CPAS_HW_IDX_ANY, &fuse_val);
 		switch (fuse_val) {
 		case 0x0:
 			if (width > CAM_CSID_RESOLUTION_22MP_WIDTH) {
@@ -1161,7 +1160,6 @@ bool cam_ife_csid_is_resolution_supported(struct cam_ife_csid_hw *csid_hw,
 		supported = true;
 	return supported;
 }
-
 int cam_ife_csid_path_reserve(struct cam_ife_csid_hw *csid_hw,
 	struct cam_csid_hw_reserve_resource_args  *reserve)
 {
@@ -1356,16 +1354,20 @@ int cam_ife_csid_path_reserve(struct cam_ife_csid_hw *csid_hw,
 	}
 
 	if (reserve->sync_mode == CAM_ISP_HW_SYNC_MASTER) {
+
+
 		width = reserve->in_port->left_stop -
 			reserve->in_port->left_start + 1;
 		if (path_data->horizontal_bin || path_data->qcfa_bin)
 			width /= 2;
+
 		if ((reserve->res_id == CAM_IFE_PIX_PATH_RES_IPP) &&
 			!(cam_ife_csid_is_resolution_supported(csid_hw,
 			width))) {
 			rc = -EINVAL;
 			goto end;
 		}
+
 		path_data->start_pixel = reserve->in_port->left_start;
 		path_data->end_pixel = reserve->in_port->left_stop;
 		path_data->width  = reserve->in_port->left_width;
@@ -1385,10 +1387,13 @@ int cam_ife_csid_path_reserve(struct cam_ife_csid_hw *csid_hw,
 			csid_hw->hw_intf->hw_idx, reserve->res_id,
 			path_data->start_line, path_data->end_line);
 	} else if (reserve->sync_mode == CAM_ISP_HW_SYNC_SLAVE) {
+
+
 		width = reserve->in_port->right_stop -
 			reserve->in_port->right_start + 1;
 		if (path_data->horizontal_bin || path_data->qcfa_bin)
 			width /= 2;
+
 		if ((reserve->res_id == CAM_IFE_PIX_PATH_RES_IPP) &&
 			!(cam_ife_csid_is_resolution_supported(csid_hw,
 			width))) {
@@ -1411,16 +1416,20 @@ int cam_ife_csid_path_reserve(struct cam_ife_csid_hw *csid_hw,
 			csid_hw->hw_intf->hw_idx, reserve->res_id,
 			path_data->start_line, path_data->end_line);
 	} else {
+
+
 		width = reserve->in_port->left_stop -
 			reserve->in_port->left_start + 1;
 		if (path_data->horizontal_bin || path_data->qcfa_bin)
 			width /= 2;
+
 		if ((reserve->res_id == CAM_IFE_PIX_PATH_RES_IPP) &&
 			!(cam_ife_csid_is_resolution_supported(csid_hw,
 			width))) {
 			rc = -EINVAL;
 			goto end;
 		}
+
 		path_data->width  = reserve->in_port->left_width;
 		path_data->start_pixel = reserve->in_port->left_start;
 		path_data->end_pixel = reserve->in_port->left_stop;
@@ -4654,6 +4663,10 @@ static int cam_ife_csid_process_cmd(void *hw_priv,
 
 }
 
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT || defined ASUS_SAKE_PROJECT || defined ASUS_VODKA_PROJECT
+extern uint8_t g_cam_csi_check;  //ASUS_BSP Bryant "Add for camera csi debug"
+#endif
+
 static int cam_csid_get_evt_payload(
 	struct cam_ife_csid_hw *csid_hw,
 	struct cam_csid_evt_payload **evt_payload)
@@ -4868,6 +4881,7 @@ static int cam_csid_handle_hw_err_irq(
 	return rc;
 }
 
+
 irqreturn_t cam_ife_csid_irq(int irq_num, void *data)
 {
 	struct cam_ife_csid_hw                         *csid_hw;
@@ -5015,6 +5029,9 @@ irqreturn_t cam_ife_csid_irq(int irq_num, void *data)
 				csid_hw->hw_intf->hw_idx,
 				soc_info->applied_src_clk_rate);
 			fatal_err_detected = true;
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT || defined ASUS_SAKE_PROJECT || defined ASUS_VODKA_PROJECT
+			g_cam_csi_check = CSID_LAN0_OVERFLOW;
+#endif
 			goto handle_fatal_error;
 		}
 		if (irq_status[CAM_IFE_CSID_IRQ_REG_RX] &
@@ -5024,6 +5041,9 @@ irqreturn_t cam_ife_csid_irq(int irq_num, void *data)
 				csid_hw->hw_intf->hw_idx,
 				soc_info->applied_src_clk_rate);
 			fatal_err_detected = true;
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT || defined ASUS_SAKE_PROJECT || defined ASUS_VODKA_PROJECT			
+			g_cam_csi_check = CSID_LAN1_OVERFLOW;
+#endif			
 			goto handle_fatal_error;
 		}
 		if (irq_status[CAM_IFE_CSID_IRQ_REG_RX] &
@@ -5033,6 +5053,9 @@ irqreturn_t cam_ife_csid_irq(int irq_num, void *data)
 				csid_hw->hw_intf->hw_idx,
 				soc_info->applied_src_clk_rate);
 			fatal_err_detected = true;
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT || defined ASUS_SAKE_PROJECT || defined ASUS_VODKA_PROJECT
+			g_cam_csi_check = CSID_LAN2_OVERFLOW;
+#endif			
 			goto handle_fatal_error;
 		}
 		if (irq_status[CAM_IFE_CSID_IRQ_REG_RX] &
@@ -5042,6 +5065,9 @@ irqreturn_t cam_ife_csid_irq(int irq_num, void *data)
 				csid_hw->hw_intf->hw_idx,
 				soc_info->applied_src_clk_rate);
 			fatal_err_detected = true;
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT || defined ASUS_SAKE_PROJECT || defined ASUS_VODKA_PROJECT
+			g_cam_csi_check = CSID_LAN3_OVERFLOW;
+#endif			
 			goto handle_fatal_error;
 		}
 		if (irq_status[CAM_IFE_CSID_IRQ_REG_RX] &
@@ -5050,6 +5076,10 @@ irqreturn_t cam_ife_csid_irq(int irq_num, void *data)
 				"CSID:%d RX_ERROR_TPG_FIFO_OVERFLOW: Backpressure from IFE",
 				csid_hw->hw_intf->hw_idx);
 			fatal_err_detected = true;
+
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT || defined ASUS_SAKE_PROJECT || defined ASUS_VODKA_PROJECT
+			g_cam_csi_check = CSID_TG_OVERFLOW;
+#endif			
 			event_type |= CAM_ISP_HW_ERROR_CSID_OVERFLOW;
 			goto handle_fatal_error;
 		}
@@ -5075,6 +5105,9 @@ irqreturn_t cam_ife_csid_irq(int irq_num, void *data)
 			CAM_ERR_RATE_LIMIT(CAM_ISP,
 				"CSID:%d CPHY_PH_CRC CPHY: Pkt Hdr CRC mismatch",
 				csid_hw->hw_intf->hw_idx);
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT || defined ASUS_SAKE_PROJECT || defined ASUS_VODKA_PROJECT
+			g_cam_csi_check = CSID_CPHY_PH_CRC;
+#endif	
 			fatal_err_detected = true;
 			goto handle_fatal_error;
 		}
@@ -5083,6 +5116,10 @@ irqreturn_t cam_ife_csid_irq(int irq_num, void *data)
 			CAM_ERR_RATE_LIMIT(CAM_ISP,
 				"CSID:%d ERROR_CRC CPHY: Long pkt payload CRC mismatch",
 				csid_hw->hw_intf->hw_idx);
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT || defined ASUS_SAKE_PROJECT || defined ASUS_VODKA_PROJECT
+			g_cam_csi_check = CSID_ERROR_CRC;
+#endif	
+
 			csid_hw->error_irq_count++;
 			non_fatal_detected = true;
 		}
@@ -5091,6 +5128,9 @@ irqreturn_t cam_ife_csid_irq(int irq_num, void *data)
 			CAM_ERR_RATE_LIMIT(CAM_ISP,
 				"CSID:%d ERROR_ECC: Dphy pkt hdr errors unrecoverable",
 				csid_hw->hw_intf->hw_idx);
+#if defined ASUS_ZS673KS_PROJECT || defined ASUS_PICASSO_PROJECT || defined ASUS_SAKE_PROJECT || defined ASUS_VODKA_PROJECT
+			g_cam_csi_check = CSID_ERROR_ECC;
+#endif	
 			fatal_err_detected = true;
 			goto handle_fatal_error;
 		}
@@ -5607,6 +5647,7 @@ int cam_ife_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,
 	ife_csid_hw->is_resetting = false;
 	ife_csid_hw->hw_info->hw_state = CAM_HW_STATE_POWER_DOWN;
 
+
 	if (!cam_cpas_is_feature_supported(CAM_CPAS_ISP_FUSE,
 		(1 << ife_csid_hw->hw_intf->hw_idx), 0) ||
 		!cam_cpas_is_feature_supported(CAM_CPAS_ISP_LITE_FUSE,
@@ -5615,6 +5656,7 @@ int cam_ife_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,
 			ife_csid_hw->hw_intf->hw_idx);
 		return -ENODEV;
 	}
+
 
 	mutex_init(&ife_csid_hw->hw_info->hw_mutex);
 	spin_lock_init(&ife_csid_hw->hw_info->hw_lock);
@@ -5637,6 +5679,7 @@ int cam_ife_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,
 		CAM_ERR(CAM_ISP, "CSID:%d Failed to init_soc", csid_idx);
 		goto err;
 	}
+
 
 	if (cam_cpas_is_feature_supported(CAM_CPAS_QCFA_BINNING_ENABLE,
 		CAM_CPAS_HW_IDX_ANY, NULL))

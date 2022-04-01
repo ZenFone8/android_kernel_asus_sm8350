@@ -1837,20 +1837,8 @@ void dp_peer_stats_update_protocol_cnt(struct cdp_soc_t *soc,
 
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
 void dp_tx_dump_flow_pool_info(struct cdp_soc_t *soc_hdl);
-
-/**
- * dp_tx_dump_flow_pool_info_compact() - dump flow pool info
- * @soc: DP soc context
- *
- * Return: none
- */
-void dp_tx_dump_flow_pool_info_compact(struct dp_soc *soc);
 int dp_tx_delete_flow_pool(struct dp_soc *soc, struct dp_tx_desc_pool_s *pool,
 	bool force);
-#else
-static inline void dp_tx_dump_flow_pool_info_compact(struct dp_soc *soc)
-{
-}
 #endif /* QCA_LL_TX_FLOW_CONTROL_V2 */
 
 #ifdef QCA_OL_DP_SRNG_LOCK_LESS_ACCESS
@@ -2323,13 +2311,11 @@ dp_get_pdev_from_soc_pdev_id_wifi3(struct dp_soc *soc,
  * @tid: TID
  * @ba_window_size: BlockAck window size
  * @start_seq: Starting sequence number
- * @bar_update: BAR update triggered
  *
  * Return: QDF_STATUS code
  */
 QDF_STATUS dp_rx_tid_update_wifi3(struct dp_peer *peer, int tid, uint32_t
-					 ba_window_size, uint32_t start_seq,
-					 bool bar_update);
+					 ba_window_size, uint32_t start_seq);
 
 /**
  * dp_get_peer_mac_list(): function to get peer mac list of vdev

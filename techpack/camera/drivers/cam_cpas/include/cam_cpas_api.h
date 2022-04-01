@@ -37,6 +37,7 @@ enum cam_cpas_reg_base {
 	CAM_CPAS_REG_MAX
 };
 
+
 /**
  * enum cam_cpas_hw_index  - Enum for identify HW index
  */
@@ -52,6 +53,7 @@ enum cam_cpas_hw_index {
 	CAM_CPAS_HW_IDX_7 = 1<<7,
 	CAM_CPAS_HW_IDX_MAX = 1<<8
 };
+
 
 /**
  * enum cam_cpas_camera_version Enum for Titan Camera Versions
@@ -671,7 +673,6 @@ int cam_cpas_get_camnoc_fifo_fill_level_info(
  */
 bool cam_cpas_is_feature_supported(uint32_t flag, uint32_t hw_map,
 	uint32_t *fuse_val);
-
 /**
  * cam_cpas_axi_util_path_type_to_string()
  *

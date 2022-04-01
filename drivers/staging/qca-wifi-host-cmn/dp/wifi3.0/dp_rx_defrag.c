@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -49,17 +49,6 @@ const struct dp_rx_defrag_cipher dp_f_wep = {
 	IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN,
 	IEEE80211_WEP_CRCLEN,
 	0,
-};
-
-/*
- * The header and mic length are same for both
- * GCMP-128 and GCMP-256.
- */
-const struct dp_rx_defrag_cipher dp_f_gcmp = {
-	"AES-GCMP",
-	WLAN_IEEE80211_GCMP_HEADERLEN,
-	WLAN_IEEE80211_GCMP_MICLEN,
-	WLAN_IEEE80211_GCMP_MICLEN,
 };
 
 /*
@@ -1431,36 +1420,6 @@ static QDF_STATUS dp_rx_defrag_reo_reinject(struct dp_peer *peer,
 #endif
 
 /*
- * dp_rx_defrag_gcmp_demic(): Remove MIC information from GCMP fragment
- * @nbuf: Pointer to the fragment buffer
- * @hdrlen: 802.11 header length
- *
- * Remove MIC information from GCMP fragment
- *
- * Returns: QDF_STATUS
- */
-static QDF_STATUS dp_rx_defrag_gcmp_demic(qdf_nbuf_t nbuf, uint16_t hdrlen)
-{
-	uint8_t *ivp, *orig_hdr;
-	int rx_desc_len = SIZE_OF_DATA_RX_TLV;
-
-	/* start of the 802.11 header */
-	orig_hdr = (uint8_t *)(qdf_nbuf_data(nbuf) + rx_desc_len);
-
-	/*
-	 * GCMP header is located after 802.11 header and EXTIV
-	 * field should always be set to 1 for GCMP protocol.
-	 */
-	ivp = orig_hdr + hdrlen;
-	if (!(ivp[IEEE80211_WEP_IVLEN] & IEEE80211_WEP_EXTIV))
-		return QDF_STATUS_E_DEFRAG_ERROR;
-
-	qdf_nbuf_trim_tail(nbuf, dp_f_gcmp.ic_trailer);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-/*
  * dp_rx_defrag(): Defragment the fragment chain
  * @peer: Pointer to the peer
  * @tid: Transmit Identifier
@@ -1482,9 +1441,6 @@ static QDF_STATUS dp_rx_defrag(struct dp_peer *peer, unsigned tid,
 	struct dp_vdev *vdev = peer->vdev;
 	struct dp_soc *soc = vdev->pdev->soc;
 	uint8_t status = 0;
-
-	if (!cur)
-		return QDF_STATUS_E_DEFRAG_ERROR;
 
 	hdr_space = dp_rx_defrag_hdrsize(soc, cur);
 	index = hal_rx_msdu_is_wlan_mcast(cur) ?
@@ -1571,22 +1527,6 @@ static QDF_STATUS dp_rx_defrag(struct dp_peer *peer, unsigned tid,
 
 		/* If success, increment header to be stripped later */
 		hdr_space += dp_f_wep.ic_header;
-		break;
-	case cdp_sec_type_aes_gcmp:
-	case cdp_sec_type_aes_gcmp_256:
-		while (cur) {
-			tmp_next = qdf_nbuf_next(cur);
-			if (dp_rx_defrag_gcmp_demic(cur, hdr_space)) {
-				QDF_TRACE(QDF_MODULE_ID_TXRX,
-					  QDF_TRACE_LEVEL_ERROR,
-					  "dp_rx_defrag: GCMP demic failed");
-
-				return QDF_STATUS_E_DEFRAG_ERROR;
-			}
-			cur = tmp_next;
-		}
-
-		hdr_space += dp_f_gcmp.ic_header;
 		break;
 	default:
 		break;
@@ -1856,11 +1796,9 @@ dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	 * If the earlier sequence was dropped, this will be the fresh start.
 	 * Else, continue with next fragment in a given sequence
 	 */
-	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	status = dp_rx_defrag_fraglist_insert(peer, tid, &rx_reorder_array_elem->head,
 			&rx_reorder_array_elem->tail, frag,
 			&all_frag_present);
-	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 
 	/*
 	 * Currently, we can have only 6 MSDUs per-MPDU, if the current
@@ -1914,7 +1852,6 @@ dp_rx_defrag_store_fragment(struct dp_soc *soc,
 		  "All fragments received for sequence: %d", rxseq);
 
 	/* Process the fragments */
-	qdf_spin_lock_bh(&rx_tid->tid_lock);
 	status = dp_rx_defrag(peer, tid, rx_reorder_array_elem->head,
 		rx_reorder_array_elem->tail);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -1933,14 +1870,12 @@ dp_rx_defrag_store_fragment(struct dp_soc *soc,
 					"%s: Failed to return link desc",
 					__func__);
 		dp_rx_defrag_cleanup(peer, tid);
-		qdf_spin_unlock_bh(&rx_tid->tid_lock);
 		goto end;
 	}
 
 	/* Re-inject the fragments back to REO for further processing */
 	status = dp_rx_defrag_reo_reinject(peer, tid,
 			rx_reorder_array_elem->head);
-	qdf_spin_unlock_bh(&rx_tid->tid_lock);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		rx_reorder_array_elem->head = NULL;
 		rx_reorder_array_elem->tail = NULL;

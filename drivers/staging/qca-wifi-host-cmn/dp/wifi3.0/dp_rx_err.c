@@ -467,8 +467,10 @@ dp_rx_pn_error_handle(struct dp_soc *soc, hal_ring_desc_t ring_desc,
  *
  * @soc: core txrx main context
  * @nbuf: pointer to msdu skb
- * @peer_id: dp peer ID
  * @rx_tlv_hdr: start of rx tlv header
+ * @mpdu_desc_info: pointer to mpdu level description info
+ * @peer_id: dp peer ID
+ * @tid: dp tid
  *
  * This function process the msdu delivered from REO2TCL
  * ring with error type OOR
@@ -478,17 +480,32 @@ dp_rx_pn_error_handle(struct dp_soc *soc, hal_ring_desc_t ring_desc,
 static void
 dp_rx_oor_handle(struct dp_soc *soc,
 		 qdf_nbuf_t nbuf,
+		 uint8_t *rx_tlv_hdr,
+		 struct hal_rx_mpdu_desc_info *mpdu_desc_info,
 		 uint16_t peer_id,
-		 uint8_t *rx_tlv_hdr)
+		 uint8_t tid)
 {
 	uint32_t frame_mask = FRAME_MASK_IPV4_ARP | FRAME_MASK_IPV4_DHCP |
 				FRAME_MASK_IPV4_EAPOL | FRAME_MASK_IPV6_DHCP;
 	struct dp_peer *peer = NULL;
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_RX_ERR);
-	if (!peer) {
-		dp_info_rl("peer not found");
+	if (!peer || tid >= DP_MAX_TIDS) {
+		dp_info_rl("peer or tid %d not valid", tid);
 		goto free_nbuf;
+	}
+
+	/*
+	 * For REO error 7 OOR, if it is retry frame under BA session,
+	 * then it is likely SN duplicated frame, do not deliver EAPOL
+	 * to stack in this case since the connection might fail due to
+	 * duplicated EAP response.
+	 */
+	if (mpdu_desc_info &&
+	    mpdu_desc_info->mpdu_flags & HAL_MPDU_F_RETRY_BIT &&
+	    peer->rx_tid[tid].ba_status == DP_RX_BA_ACTIVE) {
+		frame_mask &= ~FRAME_MASK_IPV4_EAPOL;
+		DP_STATS_INC(soc, rx.err.reo_err_oor_eapol_drop, 1);
 	}
 
 	if (dp_rx_deliver_special_frame(soc, peer, nbuf, frame_mask,
@@ -547,7 +564,6 @@ dp_rx_reo_err_entry_process(struct dp_soc *soc,
 	qdf_nbuf_t head_nbuf = NULL;
 	qdf_nbuf_t tail_nbuf = NULL;
 	uint16_t msdu_processed = 0;
-	bool ret;
 
 	peer_id = DP_PEER_METADATA_PEER_ID_GET(
 					mpdu_desc_info->peer_meta_data);
@@ -566,14 +582,6 @@ more_msdu_link_desc:
 		pdev = dp_get_pdev_for_lmac_id(soc, rx_desc->pool_id);
 
 		nbuf = rx_desc->nbuf;
-		ret = dp_rx_desc_paddr_sanity_check(rx_desc,
-						    msdu_list.paddr[i]);
-		if (!ret) {
-			DP_STATS_INC(soc, rx.err.nbuf_sanity_fail, 1);
-			rx_desc->in_err_state = 1;
-			continue;
-		}
-
 		rx_desc_pool = &soc->rx_desc_buf[rx_desc->pool_id];
 		dp_ipa_rx_buf_smmu_mapping_lock(soc);
 		dp_ipa_handle_rx_buf_smmu_mapping(soc, nbuf,
@@ -606,29 +614,29 @@ more_msdu_link_desc:
 		rx_tlv_hdr_last = qdf_nbuf_data(tail_nbuf);
 
 		if (qdf_unlikely(head_nbuf != tail_nbuf)) {
-			nbuf = dp_rx_sg_create(soc, head_nbuf);
+			nbuf = dp_rx_sg_create(head_nbuf);
 			qdf_nbuf_set_is_frag(nbuf, 1);
 			DP_STATS_INC(soc, rx.err.reo_err_oor_sg_count, 1);
 		}
 
-		switch (err_code) {
-		case HAL_REO_ERR_REGULAR_FRAME_2K_JUMP:
-			/*
-			 * only first msdu, mpdu start description tlv valid?
-			 * and use it for following msdu.
-			 */
-			if (hal_rx_msdu_end_first_msdu_get(soc->hal_soc,
-							   rx_tlv_hdr_last))
-				tid = hal_rx_mpdu_start_tid_get(
-							soc->hal_soc,
+		/*
+		 * only first msdu, mpdu start description tlv valid?
+		 * and use it for following msdu.
+		 */
+		if (hal_rx_msdu_end_first_msdu_get(soc->hal_soc,
+						   rx_tlv_hdr_last))
+			tid = hal_rx_mpdu_start_tid_get(soc->hal_soc,
 							rx_tlv_hdr_first);
 
+		switch (err_code) {
+		case HAL_REO_ERR_REGULAR_FRAME_2K_JUMP:
 			dp_2k_jump_handle(soc, nbuf, rx_tlv_hdr_last,
 					  peer_id, tid);
 			break;
 
 		case HAL_REO_ERR_REGULAR_FRAME_OOR:
-			dp_rx_oor_handle(soc, nbuf, peer_id, rx_tlv_hdr_last);
+			dp_rx_oor_handle(soc, nbuf, rx_tlv_hdr_last,
+					 mpdu_desc_info, peer_id, tid);
 			break;
 		default:
 			dp_err_rl("Non-support error code %d", err_code);
@@ -779,16 +787,6 @@ dp_rx_chain_msdus(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	return mpdu_done;
 }
 
-#ifdef WLAN_SKIP_BAR_UPDATE
-static
-void dp_rx_err_handle_bar(struct dp_soc *soc,
-			  struct dp_peer *peer,
-			  qdf_nbuf_t nbuf)
-{
-	dp_info_rl("BAR update to H.W is skipped");
-	DP_STATS_INC(soc, rx.err.bar_handle_fail_count, 1);
-}
-#else
 static
 void dp_rx_err_handle_bar(struct dp_soc *soc,
 			  struct dp_peer *peer,
@@ -798,7 +796,6 @@ void dp_rx_err_handle_bar(struct dp_soc *soc,
 	unsigned char type, subtype;
 	uint16_t start_seq_num;
 	uint32_t tid;
-	QDF_STATUS status;
 	struct ieee80211_frame_bar *bar;
 
 	/*
@@ -827,39 +824,17 @@ void dp_rx_err_handle_bar(struct dp_soc *soc,
 	dp_info_rl("tid %u window_size %u start_seq_num %u",
 		   tid, peer->rx_tid[tid].ba_win_size, start_seq_num);
 
-	status = dp_rx_tid_update_wifi3(peer, tid,
-					peer->rx_tid[tid].ba_win_size,
-					start_seq_num,
-					true);
-	if (status != QDF_STATUS_SUCCESS) {
-		dp_err_rl("failed to handle bar frame update rx tid");
-		DP_STATS_INC(soc, rx.err.bar_handle_fail_count, 1);
-	} else {
-		DP_STATS_INC(soc, rx.err.ssn_update_count, 1);
-	}
+	dp_rx_tid_update_wifi3(peer, tid,
+			       peer->rx_tid[tid].ba_win_size,
+			       start_seq_num);
 }
-#endif
 
-/**
- * dp_rx_bar_frame_handle() - Function to handle err BAR frames
- * @soc: core DP main context
- * @ring_desc: Hal ring desc
- * @rx_desc: dp rx desc
- * @mpdu_desc_info: mpdu desc info
- *
- * Handle the error BAR frames received. Ensure the SOC level
- * stats are updated based on the REO error code. The BAR frames
- * are further processed by updating the Rx tids with the start
- * sequence number (SSN) and BA window size. Desc is returned
- * to the free desc list
- *
- * Return: none
- */
 static void
 dp_rx_bar_frame_handle(struct dp_soc *soc,
 		       hal_ring_desc_t ring_desc,
 		       struct dp_rx_desc *rx_desc,
-		       struct hal_rx_mpdu_desc_info *mpdu_desc_info)
+		       struct hal_rx_mpdu_desc_info *mpdu_desc_info,
+		       uint8_t error)
 {
 	qdf_nbuf_t nbuf;
 	struct dp_pdev *pdev;
@@ -868,7 +843,6 @@ dp_rx_bar_frame_handle(struct dp_soc *soc,
 	uint16_t peer_id;
 	uint8_t *rx_tlv_hdr;
 	uint32_t tid;
-	uint8_t reo_err_code;
 
 	nbuf = rx_desc->nbuf;
 	rx_desc_pool = &soc->rx_desc_buf[rx_desc->pool_id];
@@ -894,25 +868,25 @@ dp_rx_bar_frame_handle(struct dp_soc *soc,
 	if (!peer)
 		goto next;
 
-	reo_err_code = HAL_RX_REO_ERROR_GET(ring_desc);
 	dp_info("BAR frame: peer = "QDF_MAC_ADDR_FMT
 		" peer_id = %d"
 		" tid = %u"
 		" SSN = %d"
-		" error code = %d",
+		" error status = %d",
 		QDF_MAC_ADDR_REF(peer->mac_addr.raw),
 		peer->peer_id,
 		tid,
 		mpdu_desc_info->mpdu_seq,
-		reo_err_code);
+		error);
 
-	switch (reo_err_code) {
+	switch (error) {
 	case HAL_REO_ERR_BAR_FRAME_2K_JUMP:
-		/* fallthrough */
+		DP_STATS_INC(soc,
+			     rx.err.reo_error[error], 1);
 	case HAL_REO_ERR_BAR_FRAME_OOR:
 		dp_rx_err_handle_bar(soc, peer, nbuf);
 		DP_STATS_INC(soc,
-			     rx.err.reo_error[reo_err_code], 1);
+			     rx.err.reo_error[error], 1);
 		break;
 	default:
 		DP_STATS_INC(soc, rx.bar_frame, 1);
@@ -961,7 +935,8 @@ dp_2k_jump_handle(struct dp_soc *soc,
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_RX_ERR);
 	if (!peer) {
-		dp_info_rl("%pK: peer not found", soc);
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "peer not found");
 		goto free_nbuf;
 	}
 
@@ -992,8 +967,7 @@ dp_2k_jump_handle(struct dp_soc *soc,
 					peer->vdev->vdev_id,
 					peer->mac_addr.raw,
 					tid,
-					rx_tid->delba_rcode,
-					CDP_DELBA_2K_JUMP);
+					rx_tid->delba_rcode);
 		}
 	} else {
 		qdf_spin_unlock_bh(&rx_tid->tid_lock);
@@ -1140,7 +1114,6 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	qdf_ether_header_t *eh;
 	struct hal_rx_msdu_metadata msdu_metadata;
 	uint16_t sa_idx = 0;
-	bool is_eapol;
 
 	qdf_nbuf_set_rx_chfrag_start(nbuf,
 				hal_rx_msdu_end_first_msdu_get(soc->hal_soc,
@@ -1295,38 +1268,6 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			/* IEEE80211_SEQ_MAX indicates invalid start_seq */
 	}
 
-	eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
-
-	if (!peer->authorize) {
-		is_eapol = qdf_nbuf_is_ipv4_eapol_pkt(nbuf) ||
-			   qdf_nbuf_is_ipv4_wapi_pkt(nbuf);
-
-		if (is_eapol) {
-			if (qdf_mem_cmp(eh->ether_dhost,
-					&vdev->mac_addr.raw[0],
-					QDF_MAC_ADDR_SIZE))
-				goto drop_nbuf;
-		} else {
-			goto drop_nbuf;
-		}
-	}
-
-	/*
-	 * Drop packets in this path if cce_match is found. Packets will come
-	 * in following path depending on whether tidQ is setup.
-	 * 1. If tidQ is setup: WIFILI_HAL_RX_WBM_REO_PSH_RSN_ROUTE and
-	 * cce_match = 1
-	 *    Packets with WIFILI_HAL_RX_WBM_REO_PSH_RSN_ROUTE are already
-	 *    dropped.
-	 * 2. If tidQ is not setup: WIFILI_HAL_RX_WBM_REO_PSH_RSN_ERROR and
-	 * cce_match = 1
-	 *    These packets need to be dropped and should not get delivered
-	 *    to stack.
-	 */
-	if (qdf_unlikely(dp_rx_err_cce_drop(soc, vdev, nbuf, rx_tlv_hdr))) {
-		goto drop_nbuf;
-	}
-
 	if (qdf_unlikely(vdev->rx_decap_type == htt_cmn_pkt_type_raw)) {
 		qdf_nbuf_set_next(nbuf, NULL);
 		dp_rx_deliver_raw(vdev, nbuf, peer);
@@ -1351,6 +1292,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 				 soc->hal_soc, rx_tlv_hdr) &&
 				 (vdev->rx_decap_type ==
 				  htt_cmn_pkt_type_ethernet))) {
+			eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
 			DP_STATS_INC_PKT(peer, rx.multicast, 1,
 					 qdf_nbuf_len(nbuf));
 
@@ -1435,7 +1377,8 @@ dp_rx_process_rxdma_err(struct dp_soc *soc, qdf_nbuf_t nbuf,
 
 	vdev = peer->vdev;
 	if (!vdev) {
-		dp_info_rl("INVALID vdev %pK OR osif_rx", vdev);
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+				FL("INVALID vdev %pK OR osif_rx"), vdev);
 		/* Drop & free packet */
 		qdf_nbuf_free(nbuf);
 		DP_STATS_INC(soc, rx.err.invalid_vdev, 1);
@@ -1947,11 +1890,14 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 			dp_rx_bar_frame_handle(soc,
 					       ring_desc,
 					       rx_desc,
-					       &mpdu_desc_info);
+					       &mpdu_desc_info,
+					       error);
 
 			rx_bufs_reaped[mac_id] += 1;
 			goto next_entry;
 		}
+
+		dp_info_rl("Got pkt with REO ERROR: %d", error);
 
 		if (mpdu_desc_info.mpdu_flags & HAL_MPDU_F_FRAGMENT) {
 			/*
@@ -2375,7 +2321,7 @@ done:
 		 * QCN9000 has this support
 		 */
 		if (qdf_nbuf_is_rx_chfrag_cont(nbuf)) {
-			nbuf = dp_rx_sg_create(soc, nbuf);
+			nbuf = dp_rx_sg_create(nbuf);
 			next = nbuf->next;
 			/*
 			 * SG error handling is not done correctly,
@@ -2449,8 +2395,9 @@ done:
 									       rx_tlv_hdr);
 					nbuf->next = NULL;
 					dp_rx_oor_handle(soc, nbuf,
-							 peer_id,
-							 rx_tlv_hdr);
+							 rx_tlv_hdr,
+							 NULL,
+							 peer_id, tid);
 					break;
 				case HAL_REO_ERR_BAR_FRAME_2K_JUMP:
 				case HAL_REO_ERR_BAR_FRAME_OOR:
@@ -2775,13 +2722,11 @@ dp_rxdma_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 	dp_srng_access_end(int_ctx, soc, err_dst_srng);
 
 	if (rx_bufs_used) {
-		if (wlan_cfg_per_pdev_lmac_ring(soc->wlan_cfg_ctx)) {
+		if (wlan_cfg_per_pdev_lmac_ring(soc->wlan_cfg_ctx))
 			dp_rxdma_srng = &soc->rx_refill_buf_ring[mac_id];
-			rx_desc_pool = &soc->rx_desc_buf[mac_id];
-		} else {
+		else
 			dp_rxdma_srng = &soc->rx_refill_buf_ring[pdev->lmac_id];
-			rx_desc_pool = &soc->rx_desc_buf[pdev->lmac_id];
-		}
+		rx_desc_pool = &soc->rx_desc_buf[mac_id];
 
 		dp_rx_buffers_replenish(soc, mac_id, dp_rxdma_srng,
 			rx_desc_pool, rx_bufs_used, &head, &tail);
