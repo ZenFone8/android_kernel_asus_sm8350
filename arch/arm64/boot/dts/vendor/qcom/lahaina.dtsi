@@ -390,6 +390,17 @@
 		reg = <0x0 0x8b600000 0x0 0x100000>;
 	};
 
+		asus_debug_mem: asus_debug_resion@9b800000 {
+			no-map;
+			reg = <0x0 0x9b800000 0x0 0x00400000>;
+		};
+
+
+		hyp_reserved_mem: qheebsp_dbg_vm_hyp_region@d0000000 {
+			no-map;
+			//reg = <0x0 0xd0000000 0x0 0x800000>;
+		};
+
 	pil_modem_mem: modem_region@8b800000 {
 		no-map;
 		reg = <0x0 0x8b800000 0x0 0x10000000>;
@@ -402,27 +413,27 @@
 
 	pil_trustedvm_mem: pil_trustedvm_region@d0800000 {
 		no-map;
-		reg = <0x0 0xd0800000 0x0 0x76f7000>;
+		//reg = <0x0 0xd0800000 0x0 0x76f7000>;
 	};
 
 	qrtr_shbuf: qrtr-shmem {
 		no-map;
-		reg = <0x0 0xd7ef7000 0x0 0x9000>;
+		//reg = <0x0 0xd7ef7000 0x0 0x9000>;
 	};
 
 	chan0_shbuf: neuron_block@0 {
 		no-map;
-		reg = <0x0 0xd7f00000 0x0 0x80000>;
+		//reg = <0x0 0xd7f00000 0x0 0x80000>;
 	};
 
 	chan1_shbuf: neuron_block@1 {
 		no-map;
-		reg = <0x0 0xd7f80000 0x0 0x80000>;
+		//reg = <0x0 0xd7f80000 0x0 0x80000>;
 	};
 
 	removed_mem: removed_region@d8800000 {
 		no-map;
-		reg = <0x0 0xd8800000 0x0 0x6800000>;
+		reg = <0x0 0xd8800000 0x0 0xa800000>;
 	};
 
 	adsp_mem: adsp_region {
@@ -523,7 +534,7 @@
 	};
 
 	splash_memory:splash_region {
-		reg = <0x0 0xe1000000 0x0 0x02300000>;
+		reg = <0x0 0xe5000000 0x0 0x02300000>;
 		label = "cont_splash_region";
 	};
 
@@ -542,7 +553,7 @@
 	};
 
 	dfps_data_memory: dfps_data_region {
-		reg = <0x0 0xe3300000 0x0 0x0100000>;
+		reg = <0x0 0xe7300000 0x0 0x0100000>;
 		label = "dfps_data_region";
 	};
 
@@ -2202,7 +2213,7 @@
 			class = "message-queue";
 			direction = "receive";
 			max-size = <0 65536>;
-			shared-buffer = <&chan0_shbuf>;
+			//shared-buffer = <&chan0_shbuf>;
 			qcom,primary;
 			haven-label = <1>;
 			peer-name = <2>;
@@ -2214,7 +2225,7 @@
 			class = "message-queue";
 			direction = "send";
 			max-size = <0 65536>;
-			shared-buffer = <&chan1_shbuf>;
+			//shared-buffer = <&chan1_shbuf>;
 			qcom,primary;
 			haven-label = <2>;
 			peer-name = <2>;
@@ -2239,7 +2250,7 @@
 		qcom,master;
 		haven-label = <3>;
 		peer-name = <2>;
-		shared-buffer = <&qrtr_shbuf>;
+		//shared-buffer = <&qrtr_shbuf>;
 	};
 
 	jtag_mm0: jtagmm@7040000 {
@@ -3034,7 +3045,7 @@
 
 	qcom,rmtfs_sharedmem@0 {
 		compatible = "qcom,sharedmem-uio";
-		reg = <0x0 0x280000>;
+		reg = <0x0 0x300000>;
 		reg-names = "rmtfs";
 		qcom,client-id = <0x00000001>;
 	};
@@ -5207,7 +5218,7 @@
 		status = "ok";
 		qcom,pas-id = <28>;
 		qcom,firmware-name = "trustedvm";
-		memory-region = <&pil_trustedvm_mem>;
+		//memory-region = <&pil_trustedvm_mem>;
 	};
 
 	qcom,guestvm_loader {
@@ -5399,7 +5410,7 @@
 		qcom,same-dt-multi-dev;
 
 		vdd-wlan-aon-supply = <&S2E>;
-		qcom,vdd-wlan-aon-config = <950000 952000 0 0 1>;
+		qcom,vdd-wlan-aon-config = <976000 976000 0 0 1>;
 		vdd-wlan-dig-supply = <&S11B>;
 		qcom,vdd-wlan-dig-config = <950000 952000 0 0 1>;
 		vdd-wlan-io-supply = <&S10B>;
@@ -5408,8 +5419,6 @@
 		qcom,vdd-wlan-rfa1-config = <1880000 1880000 0 0 1>;
 		vdd-wlan-rfa2-supply = <&S12B>;
 		qcom,vdd-wlan-rfa2-config = <1350000 1350000 0 0 1>;
-		wlan-ant-switch-supply = <&L7E>;
-		qcom,wlan-ant-switch-config = <2800000 2800000 0 0 0>;
 
 		interconnects =
 		<&aggre2_noc MASTER_PCIE_0 &aggre2_noc SLAVE_ANOC_PCIE_GEM_NOC>,
@@ -5656,13 +5665,13 @@
 		qcom,bt-vdd-dig-supply = <&S11B>;
 		qcom,bt-vdd-rfa1-supply = <&S1C>;
 		qcom,bt-vdd-rfa2-supply = <&S12B>;
-		qcom,bt-vdd-asd-supply = <&L7E>;
+              qcom,bt-vdd-asd-supply = <&L7E>;
 
 		qcom,bt-vdd-aon-config = <950000 950000 0 1>;
 		qcom,bt-vdd-dig-config = <950000 950000 0 1>;
 		qcom,bt-vdd-rfa1-config = <1880000 1880000 0 1>;
 		qcom,bt-vdd-rfa2-config = <1350000 1350000 0 1>;
-		qcom,bt-vdd-asd-config = <2800000 2800000 0 1>;
+              qcom,bt-vdd-asd-config = <2800000 2800000 0 1>;
 	};
 
 	wil6210: qcom,wil6210 {
@@ -5775,8 +5784,6 @@
 		compatible = "rtc6226";
 		reg = <0x64>;
 		fmint-gpio = <&tlmm 50 0>;
-		vdd-supply = <&L7E>;
-		rtc6226,vdd-supply-voltage = <2800000 2800000>;
 		vio-supply = <&S10B>;
 		rtc6226,vio-supply-voltage = <1800000 1800000 >;
 	};
