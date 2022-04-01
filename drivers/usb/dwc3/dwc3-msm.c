@@ -44,11 +44,11 @@
 #include <linux/usb/dwc3-msm.h>
 #include <linux/usb/role.h>
 #include <linux/usb/redriver.h>
-#ifdef CONFIG_QGKI_MSM_BOOT_TIME_MARKER
-#include <soc/qcom/boot_stats.h>
-#endif
 #ifdef CONFIG_MACH_ASUS
 #include <linux/gpio.h>
+#endif
+#ifdef CONFIG_QGKI_MSM_BOOT_TIME_MARKER
+#include <soc/qcom/boot_stats.h>
 #endif
 
 #include "core.h"
@@ -3480,11 +3480,7 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc, bool force_power_collapse,
 	if (mdwc->lpm_flags & MDWC3_USE_PWR_EVENT_IRQ_FOR_WAKEUP)
 		enable_irq(mdwc->wakeup_irq[PWR_EVNT_IRQ].irq);
 
-#ifdef CONFIG_MACH_ASUS
 	dev_info(mdwc->dev, "[USB] DWC3 in low power mode\n");
-#else
-	dev_info(mdwc->dev, "DWC3 in low power mode\n");
-#endif
 
 	dbg_event(0xFF, "Ctl Sus", atomic_read(&dwc->in_lpm));
 

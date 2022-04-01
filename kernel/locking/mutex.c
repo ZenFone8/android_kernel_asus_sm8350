@@ -1124,7 +1124,6 @@ skip_wait:
 #ifdef CONFIG_MACH_ASUS
 	lock->mutex_owner_asusdebug = current;
 #endif
-
 	if (ww_ctx)
 		ww_mutex_lock_acquired(ww, ww_ctx);
 

@@ -150,7 +150,10 @@ static int32_t cam_flash_driver_cmd(struct cam_flash_ctrl *fctrl,
 			fctrl->flash_state,
 			CAM_FLASH_STATE_INIT); //ASUS_BSP Shianliang "add log for debug"
 		#endif
+
+
 		fctrl->streamoff_count = 0;
+
 		fctrl->flash_state = CAM_FLASH_STATE_INIT;
 		break;
 	}

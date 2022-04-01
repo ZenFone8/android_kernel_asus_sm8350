@@ -623,13 +623,13 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 			name = desc->action->name;
 		else if (desc->irq_data.chip && desc->irq_data.chip->name)
 			name = desc->irq_data.chip->name;
+		pr_warn("%s: irq:%d hwirq:%u triggered %s\n",
+			 __func__, irq, i, name);
     //[PM_debug +++]
         //irq debug
         //save IRQ's counts and number
 		gic_resume_irq = irq;
 		gic_irq_cnt++;
-		pr_warn("%s: irq:%d hwirq:%u triggered %s\n",
-			 __func__, irq, i, name);
 	}
 	printk("irq count: %d\n", gic_irq_cnt);        
     //[PM_debug ---]

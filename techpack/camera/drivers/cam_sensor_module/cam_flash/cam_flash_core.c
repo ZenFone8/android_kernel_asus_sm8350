@@ -493,6 +493,7 @@ int cam_flash_off(struct cam_flash_ctrl *flash_ctrl)
 	asus_flash_state = 0; //ASUS_BSP +++ Shianliang add low battery checking
 	#endif
 
+
 	if ((flash_ctrl->i2c_data.streamoff_settings.is_settings_valid) &&
 		(flash_ctrl->i2c_data.streamoff_settings.request_id == 0)) {
 		flash_ctrl->apply_streamoff = true;

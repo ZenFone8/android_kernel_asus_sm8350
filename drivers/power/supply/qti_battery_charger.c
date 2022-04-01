@@ -62,10 +62,10 @@
 //Move to battery_charger.h
 #else
 enum psy_type {
-        PSY_TYPE_BATTERY,
-        PSY_TYPE_USB,
-        PSY_TYPE_WLS,
-        PSY_TYPE_MAX,
+	PSY_TYPE_BATTERY,
+	PSY_TYPE_USB,
+	PSY_TYPE_WLS,
+	PSY_TYPE_MAX,
 };
 #endif
 
@@ -2138,6 +2138,7 @@ static int battery_chg_probe(struct platform_device *pdev)
 #endif
 #endif
 	//[+++]ASUS_BSP : Add for OEM sub-function
+
 	rc = register_extcon_conn_type(bcdev);
 	if (rc < 0)
 		dev_warn(dev, "Failed to register extcon rc=%d\n", rc);
@@ -2171,7 +2172,6 @@ static int battery_chg_remove(struct platform_device *pdev)
 	debugfs_remove_recursive(bcdev->debugfs_dir);
 	class_unregister(&bcdev->battery_class);
 	unregister_reboot_notifier(&bcdev->reboot_notifier);
-	qti_typec_class_deinit(bcdev->typec_class);
 
 #ifdef CONFIG_MACH_ASUS
 #if defined ASUS_SAKE_PROJECT || defined ASUS_VODKA_PROJECT
@@ -2180,6 +2180,8 @@ static int battery_chg_remove(struct platform_device *pdev)
 	asuslib_deinit();//ASUS_BSP : Add for sub-function
 #endif
 #endif
+
+	qti_typec_class_deinit(bcdev->typec_class);
 	rc = pmic_glink_unregister_client(bcdev->client);
 	if (rc < 0) {
 		pr_err("Error unregistering from pmic_glink, rc=%d\n", rc);

@@ -618,7 +618,6 @@ static int get_cali_from_file(u32 *cali_re)
 
 }
 #endif
-
 static inline int get_max_fifo_samples(struct haptics_chip *chip)
 {
 	int val = 0;

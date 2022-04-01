@@ -1289,6 +1289,7 @@ int dsi_display_set_power(struct drm_connector *connector,
 
 	switch (power_mode) {
 	case SDE_MODE_DPMS_LP1:
+		DSI_LOG("enter LP1 doze\n");
 		if (display->panel->power_mode == SDE_MODE_DPMS_LP2) {
 			if (dsi_display_set_ulp_load(display, false) < 0)
 				DSI_WARN("failed to set load for lp1 state\n");
@@ -7844,7 +7845,7 @@ static void dsi_display_handle_fifo_underflow(struct work_struct *work)
 	display = container_of(work, struct dsi_display, fifo_underflow_work);
 	if (!display || !display->panel ||
 	    atomic_read(&display->panel->esd_recovery_pending)) {
-		DSI_DEBUG("Invalid recovery use case\n");
+		DSI_INFO("Invalid recovery use case\n");
 		return;
 	}
 
@@ -7885,7 +7886,7 @@ static void dsi_display_handle_fifo_overflow(struct work_struct *work)
 	if (!display || !display->panel ||
 	    (display->panel->panel_mode != DSI_OP_VIDEO_MODE) ||
 	    atomic_read(&display->panel->esd_recovery_pending)) {
-		DSI_DEBUG("Invalid recovery use case\n");
+		DSI_INFO("Invalid recovery use case\n");
 		return;
 	}
 
@@ -7966,7 +7967,7 @@ static void dsi_display_handle_lp_rx_timeout(struct work_struct *work)
 	if (!display || !display->panel ||
 	    (display->panel->panel_mode != DSI_OP_VIDEO_MODE) ||
 	    atomic_read(&display->panel->esd_recovery_pending)) {
-		DSI_DEBUG("Invalid recovery use case\n");
+		DSI_INFO("Invalid recovery use case\n");
 		return;
 	}
 

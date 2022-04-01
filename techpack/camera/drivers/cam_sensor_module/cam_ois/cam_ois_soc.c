@@ -97,10 +97,6 @@ static int cam_ois_get_dt_data(struct cam_ois_ctrl_t *o_ctrl)
 		return rc;
 	}
 
-	rc = cam_sensor_util_regulator_powerup(soc_info);
-	if (rc < 0)
-		return rc;
-
 	//ASUS_BSP +++ Zhengwei "read id register when probe"
 	power_info->dev = o_ctrl->soc_info.dev;
 	/* Initialize default parameters */
@@ -145,6 +141,12 @@ static int cam_ois_get_dt_data(struct cam_ois_ctrl_t *o_ctrl)
 		return rc;
 	}
 	//ASUS_BSP --- Zhengwei "read id register when probe"
+
+
+	rc = cam_sensor_util_regulator_powerup(soc_info);
+	if (rc < 0)
+		return rc;
+
 
 	if (!soc_info->gpio_data) {
 		CAM_INFO(CAM_OIS, "No GPIO found");

@@ -51,8 +51,7 @@
 #define AP3425_REG_ALS_THDH_L      	0x1C
 #define AP3425_REG_ALS_THDH_H      	0x1D
 
-/* ap3425 
-PS Register set */
+/* ap3425 PS Register set */
 #define AP3425_REG_PS_LEDG         		0x20 /*PS GAIN*/
 #define AP3425_REG_PS_LEDD         		0x21 /*PS LED DRIVER*/
 #define AP3425_REG_PS_IFORM        		0x22 /* PS INT Mode*/

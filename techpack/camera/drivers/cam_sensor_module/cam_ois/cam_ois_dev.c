@@ -12,7 +12,6 @@
 #include "onsemi_i2c.h"
 #include "onsemi_interface.h"
 #include "asus_ois.h"
-
 struct mutex g_dualoisMutex; //ASUS_BSP Byron add for protect dual ois
 
 static int cam_ois_subdev_close_internal(struct v4l2_subdev *sd,
