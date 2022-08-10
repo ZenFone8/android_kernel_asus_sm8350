@@ -819,8 +819,6 @@ int dsi_display_unset_clk_src(struct dsi_display *display);
  */
 int dsi_display_set_clk_src(struct dsi_display *display);
 
-struct dsi_display *get_main_display(void);
-
 /**
  * dsi_display_ctrl_vreg_on() - enable dsi ctrl regulator
  * @display:         Handle to display
