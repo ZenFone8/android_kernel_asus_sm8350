@@ -643,6 +643,7 @@ static u32 dsi_panel_get_fod_dim_alpha(struct dsi_panel *panel)
 	u32 brightness = dsi_panel_get_backlight(panel);
 	int i;
 
+	DSI_ERR("[%s] Brightness value = %u\n", panel->name, brightness);
 	if (!panel->fod_dim_lut)
 		return 0;
 
