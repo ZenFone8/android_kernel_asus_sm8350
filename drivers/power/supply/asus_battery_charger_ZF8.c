@@ -72,10 +72,10 @@ static const char * const qc_power_supply_usb_type_text[] = {
     "HVDCP", "HVDCP_3", "HVDCP_3P5"
 };
 
-//ASUS_BSP +++ add to printk the WIFI hotspot & QXDM UTS event
+//ASUS_BSP +++ add to pr_debug the WIFI hotspot & QXDM UTS event
 bool g_qxdm_en = false;
 bool g_wifi_hs_en = false;
-//ASUS_BSP --- add to printk the WIFI hotspot & QXDM UTS event
+//ASUS_BSP --- add to pr_debug the WIFI hotspot & QXDM UTS event
 
 //ASUS_BSP battery safety upgrade +++
 #define CYCLE_COUNT_DATA_MAGIC  0x85
@@ -191,7 +191,7 @@ static struct BAT_HEALTH_DATA_BACKUP g_bat_health_data_backup[BAT_HEALTH_NUMBER_
 struct delayed_work battery_health_work;
 //ASUS_BS battery health upgrade ---
 
-//ASUS_BSP +++ LiJen add to printk the WIFI hotspot & QXDM UTS event
+//ASUS_BSP +++ LiJen add to pr_debug the WIFI hotspot & QXDM UTS event
 #include <linux/proc_fs.h>
 #define uts_status_PROC_FILE	"driver/UTSstatus"
 static struct proc_dir_entry *uts_status_proc_file;
@@ -214,23 +214,23 @@ static ssize_t uts_status_proc_write(struct file *filp, const char __user *buff,
 
 	switch (val) {
 	case 0:
-		printk("%s: WIFI Hotspot disable\n");
+		pr_debug("%s: WIFI Hotspot disable\n");
 		g_wifi_hs_en = false;
 		break;
 	case 1:
-		printk("%s: WIFI Hotspot enable\n");
+		pr_debug("%s: WIFI Hotspot enable\n");
 		g_wifi_hs_en = true;
 		break;
 	case 2:
-		printk("%s: QXDM disable\n");
+		pr_debug("%s: QXDM disable\n");
 		g_qxdm_en = false;
 		break; 
 	case 3:
-		printk("%s: QXDM enable\n");
+		pr_debug("%s: QXDM enable\n");
 		g_qxdm_en = true;
 		break;       
 	default:
-		printk("%s: Invalid mode\n");
+		pr_debug("%s: Invalid mode\n");
 		break;
 	}
     
@@ -255,12 +255,12 @@ void static create_uts_status_proc_file(void)
 	uts_status_proc_file = proc_create(uts_status_PROC_FILE, 0666, NULL, &uts_status_fops);
 
     if (uts_status_proc_file) {
-		printk("create_uts_status_proc_file sucessed!\n");
+		pr_debug("create_uts_status_proc_file sucessed!\n");
     } else {
-	    printk("create_uts_status_proc_file failed!\n");
+	    pr_debug("create_uts_status_proc_file failed!\n");
     }
 }
-//ASUS_BSP --- LiJen add to printk the WIFI hotspot & QXDM UTS event
+//ASUS_BSP --- LiJen add to pr_debug the WIFI hotspot & QXDM UTS event
 
 #if defined ASUS_VODKA_PROJECT
 #include <linux/proc_fs.h>
@@ -382,7 +382,7 @@ static int drm_notifier_callback(struct notifier_block *self,
     int *blank = NULL;
 
     if (!evdata) {
-        printk("[BAT][CHG]drm_notifier_callback: evdata is null");
+        pr_debug("[BAT][CHG]drm_notifier_callback: evdata is null");
         return 0;
     }
 
@@ -397,25 +397,25 @@ static int drm_notifier_callback(struct notifier_block *self,
 
     switch (*blank) {
     case DRM_PANEL_BLANK_UNBLANK:
-        printk("[BAT][CHG] DRM_PANEL_BLANK_UNBLANK,Display on");
+        pr_debug("[BAT][CHG] DRM_PANEL_BLANK_UNBLANK,Display on");
         if (DRM_PANEL_EARLY_EVENT_BLANK == event) {
             //pr_debug("resume: event = %lu, not care", event);
         } else if (DRM_PANEL_EVENT_BLANK == event) {
-            printk("[BAT][CHG] asus_set_panelonoff_charging_current_limit = true");
+            pr_debug("[BAT][CHG] asus_set_panelonoff_charging_current_limit = true");
             schedule_delayed_work(&asus_set_panelonoff_current_work, 0);
         }
         break;
     case DRM_PANEL_BLANK_POWERDOWN:
-        printk("[BAT][CHG] DRM_PANEL_BLANK_POWERDOWN,Display off");
+        pr_debug("[BAT][CHG] DRM_PANEL_BLANK_POWERDOWN,Display off");
         if (DRM_PANEL_EARLY_EVENT_BLANK == event) {
             ;
         } else if (DRM_PANEL_EVENT_BLANK == event) {
-            printk("[BAT][CHG] asus_set_panelonoff_charging_current_limit = false");
+            pr_debug("[BAT][CHG] asus_set_panelonoff_charging_current_limit = false");
             schedule_delayed_work(&asus_set_panelonoff_current_work, 0);
         }
         break;
     case DRM_PANEL_BLANK_LP:
-        printk("[BAT][CHG] DRM_PANEL_BLANK_LP,Display resume into LP1/LP2");
+        pr_debug("[BAT][CHG] DRM_PANEL_BLANK_LP,Display resume into LP1/LP2");
         break;
     case DRM_PANEL_BLANK_FPS_CHANGE:
         break;
@@ -539,7 +539,7 @@ static ssize_t asus_get_FG_SoC_show(struct class *c,
         return rc;
     }
     bat_cap = prop.intval;
-    printk(KERN_ERR "%s. BAT_SOC : %d", __func__, bat_cap);
+    pr_debug("%s. BAT_SOC : %d", __func__, bat_cap);
 
     return scnprintf(buf, PAGE_SIZE, "%d\n", bat_cap);
 }
@@ -1693,7 +1693,7 @@ static void print_battery_status(void) {
 	union power_supply_propval prop = {};
 	char battInfo[256];
     int bat_cap, fcc,bat_vol,bat_cur,bat_temp,charge_status,bat_health,rc = 0;
-    char UTSInfo[256]; //ASUS_BSP add to printk the WIFI hotspot & QXDM UTS event
+    char UTSInfo[256]; //ASUS_BSP add to pr_debug the WIFI hotspot & QXDM UTS event
 
     rc = power_supply_get_property(qti_phy_bat,
         POWER_SUPPLY_PROP_CAPACITY, &prop);
@@ -1759,9 +1759,9 @@ static void print_battery_status(void) {
 			charging_stats[charge_status],
 			health_type[bat_health]);
 
-	//ASUS_BSP +++ add to printk the WIFI hotspot & QXDM UTS event
+	//ASUS_BSP +++ add to pr_debug the WIFI hotspot & QXDM UTS event
 	snprintf(UTSInfo, sizeof(UTSInfo), "WIFI_HS=%d, QXDM=%d", g_wifi_hs_en, g_qxdm_en);
-	//ASUS_BSP --- add to printk the WIFI hotspot & QXDM UTS event
+	//ASUS_BSP --- add to pr_debug the WIFI hotspot & QXDM UTS event
 	
 	ktime_get_coarse_real_ts64(&g_last_print_time);
 	schedule_delayed_work(&g_bcdev->update_gauge_status_work, 180*HZ);
@@ -1870,7 +1870,7 @@ static void asus_jeita_rule_worker(struct work_struct *dat){
     u32 tmp;
 
     tmp = WORK_JEITA_RULE;
-    printk(KERN_ERR "[BAT][CHG]%s set BATTMAN_OEM_WORK_EVENT : WORK_JEITA_RULE", __func__);
+    pr_debug("[BAT][CHG]%s set BATTMAN_OEM_WORK_EVENT : WORK_JEITA_RULE", __func__);
     rc = oem_prop_write(BATTMAN_OEM_WORK_EVENT, &tmp, 1);
     if (rc < 0) {
         pr_err("Failed to set BATTMAN_OEM_WORK_EVENT WORK_JEITA_RULE rc=%d\n", rc);
@@ -1887,7 +1887,7 @@ static void asus_jeita_prechg_worker(struct work_struct *dat){
     u32 tmp;
 
     tmp = WORK_JEITA_PRECHG;
-    printk(KERN_ERR "[BAT][CHG]%s set BATTMAN_OEM_WORK_EVENT : WORK_JEITA_PRECHG", __func__);
+    pr_debug("[BAT][CHG]%s set BATTMAN_OEM_WORK_EVENT : WORK_JEITA_PRECHG", __func__);
     rc = oem_prop_write(BATTMAN_OEM_WORK_EVENT, &tmp, 1);
     if (rc < 0) {
         pr_err("Failed to set BATTMAN_OEM_WORK_EVENT WORK_JEITA_PRECHG rc=%d\n", rc);
@@ -1901,7 +1901,7 @@ static void asus_jeita_cc_worker(struct work_struct *dat){
     u32 tmp;
 
     tmp = WORK_JEITA_CC;
-    printk(KERN_ERR "[BAT][CHG]%s set BATTMAN_OEM_WORK_EVENT : WORK_JEITA_CC", __func__);
+    pr_debug("[BAT][CHG]%s set BATTMAN_OEM_WORK_EVENT : WORK_JEITA_CC", __func__);
     rc = oem_prop_write(BATTMAN_OEM_WORK_EVENT, &tmp, 1);
     if (rc < 0) {
         pr_err("Failed to set BATTMAN_OEM_WORK_EVENT WORK_JEITA_CC rc=%d\n", rc);
@@ -1915,7 +1915,7 @@ static void asus_panel_check_worker(struct work_struct *dat){
     u32 tmp;
 
     tmp = WORK_PANEL_CHECK;
-    printk(KERN_ERR "[BAT][CHG]%s set BATTMAN_OEM_WORK_EVENT : WORK_PANEL_CHECK", __func__);
+    pr_debug("[BAT][CHG]%s set BATTMAN_OEM_WORK_EVENT : WORK_PANEL_CHECK", __func__);
     rc = oem_prop_write(BATTMAN_OEM_WORK_EVENT, &tmp, 1);
     if (rc < 0) {
         pr_err("Failed to set BATTMAN_OEM_WORK_EVENT WORK_PANEL_CHECK rc=%d\n", rc);
@@ -1967,7 +1967,7 @@ static void asus_18W_workaround_worker(struct work_struct *dat){
     u32 tmp;
 
     tmp = WORK_18W_WORKAROUND;
-    printk(KERN_ERR "[BAT][CHG]%s set BATTMAN_OEM_WORK_EVENT : WORK_18W_WORKAROUND", __func__);
+    pr_debug("[BAT][CHG]%s set BATTMAN_OEM_WORK_EVENT : WORK_18W_WORKAROUND", __func__);
     rc = oem_prop_write(BATTMAN_OEM_WORK_EVENT, &tmp, 1);
     if (rc < 0) {
         pr_err("Failed to set BATTMAN_OEM_WORK_EVENT WORK_18W_WORKAROUND rc=%d\n", rc);
@@ -1980,7 +1980,7 @@ void asus_monitor_start(int status){
     if (asus_usb_online == status) return;
 
     asus_usb_online = status;
-    printk(KERN_ERR "[BAT][CHG] asus_monitor_start %d\n", asus_usb_online);
+    pr_debug("[BAT][CHG] asus_monitor_start %d\n", asus_usb_online);
     if(asus_usb_online){
         cancel_delayed_work_sync(&asus_jeita_rule_work);
         schedule_delayed_work(&asus_jeita_rule_work, 0);
@@ -3265,11 +3265,11 @@ static void create_batt_cycle_count_proc_file(void)
     if(!asus_batt_batt_safety_proc_file)
         CHG_DBG("[BAT][CHG]%s batt_safety_proc_file create failed!\n", __func__);
     if(!asus_batt_batt_safety_csc_proc_file)
-        printk("batt_safety_csc_proc_file create failed!\n");
+        pr_debug("batt_safety_csc_proc_file create failed!\n");
     if (!asus_batt_safety_condition_proc_file)
-        printk(" create asus_batt_safety_condition_proc_file failed!\n");
+        pr_debug(" create asus_batt_safety_condition_proc_file failed!\n");
     if (!batt_health_config_proc_file)
-        printk(" create batt_health_config_proc_file failed!\n");
+        pr_debug(" create batt_health_config_proc_file failed!\n");
 }
 
 static int reboot_shutdown_prep(struct notifier_block *this,
@@ -3297,7 +3297,7 @@ int asuslib_init(void) {
     struct pmic_glink_client_data client_data = { };
     struct pmic_glink_client    *client;
 
-    printk(KERN_ERR "%s +++\n", __func__);
+    pr_debug("%s +++\n", __func__);
     // Initialize the necessary power supply
     rc = asus_init_power_supply_prop();
     if (rc < 0) {
@@ -3344,13 +3344,13 @@ int asuslib_init(void) {
     quickchg_extcon = extcon_dev_allocate(asus_fg_extcon_cable);
     if (IS_ERR(quickchg_extcon)) {
         rc = PTR_ERR(quickchg_extcon);
-        printk(KERN_ERR "[BAT][CHG] failed to allocate ASUS quickchg extcon device rc=%d\n", rc);
+        pr_debug("[BAT][CHG] failed to allocate ASUS quickchg extcon device rc=%d\n", rc);
     }
     quickchg_extcon->fnode_name = "quick_charging";
 
     rc = extcon_dev_register(quickchg_extcon);
     if (rc < 0)
-        printk(KERN_ERR "[BAT][CHG] failed to register ASUS quickchg extcon device rc=%d\n", rc);
+        pr_debug("[BAT][CHG] failed to register ASUS quickchg extcon device rc=%d\n", rc);
 
     asus_extcon_set_state_sync(quickchg_extcon, SWITCH_LEVEL0_DEFAULT);
 
@@ -3394,7 +3394,7 @@ int asuslib_init(void) {
         rc = PTR_ERR(bat_extcon);
     }
     bat_extcon->fnode_name = "battery";
-    printk("[BAT]extcon_dev_register");
+    pr_debug("[BAT]extcon_dev_register");
     rc = extcon_dev_register(bat_extcon);
     bat_extcon->name = st_battery_name;
     bat_id_extcon = extcon_dev_allocate(asus_fg_extcon_cable);
@@ -3402,20 +3402,20 @@ int asuslib_init(void) {
         rc = PTR_ERR(bat_id_extcon);
     }       
     bat_id_extcon->fnode_name = "battery_id";
-    printk("[BAT]extcon_dev_register");
+    pr_debug("[BAT]extcon_dev_register");
     rc = extcon_dev_register(bat_id_extcon);
 
     //[+++]Register the extcon for thermal alert
     thermal_extcon = extcon_dev_allocate(asus_fg_extcon_cable);
     if (IS_ERR(thermal_extcon)) {
         rc = PTR_ERR(thermal_extcon);
-        printk(KERN_ERR "[BAT][CHG] failed to allocate ASUS thermal alert extcon device rc=%d\n", rc);
+        pr_debug("[BAT][CHG] failed to allocate ASUS thermal alert extcon device rc=%d\n", rc);
     }
     thermal_extcon->fnode_name = "usb_connector";
 
     rc = extcon_dev_register(thermal_extcon);
     if (rc < 0)
-        printk(KERN_ERR "[BAT][CHG] failed to register ASUS thermal alert extcon device rc=%d\n", rc);
+        pr_debug("[BAT][CHG] failed to register ASUS thermal alert extcon device rc=%d\n", rc);
 
     usb_conn_temp_vadc_chan = iio_channel_get(g_bcdev->dev, "pm8350b_amux_thm4");
     if (IS_ERR_OR_NULL(usb_conn_temp_vadc_chan)) {
@@ -3430,13 +3430,13 @@ int asuslib_init(void) {
     adaptervid_extcon = extcon_dev_allocate(asus_fg_extcon_cable);
     if (IS_ERR(adaptervid_extcon)) {
         rc = PTR_ERR(adaptervid_extcon);
-        printk(KERN_ERR "[BAT][CHG] failed to allocate ASUS adaptervid extcon device rc=%d\n", rc);
+        pr_debug("[BAT][CHG] failed to allocate ASUS adaptervid extcon device rc=%d\n", rc);
     }
     adaptervid_extcon->fnode_name = "adaptervid";
 
     rc = extcon_dev_register(adaptervid_extcon);
     if (rc < 0)
-        printk(KERN_ERR "[BAT][CHG] failed to register ASUS adaptervid extcon device rc=%d\n", rc);
+        pr_debug("[BAT][CHG] failed to register ASUS adaptervid extcon device rc=%d\n", rc);
 
     asus_extcon_set_state_sync(adaptervid_extcon, 0);
     //[---]Register the extcon for adaptervid_extcon
@@ -3446,7 +3446,7 @@ int asuslib_init(void) {
 
     asus_get_Batt_ID();
 
-	create_uts_status_proc_file(); //ASUS_BSP LiJen add to printk the WIFI hotspot & QXDM UTS event
+	create_uts_status_proc_file(); //ASUS_BSP LiJen add to pr_debug the WIFI hotspot & QXDM UTS event
 	
 	INIT_DELAYED_WORK(&g_bcdev->update_gauge_status_work, update_gauge_status_worker);
 	schedule_delayed_work(&g_bcdev->update_gauge_status_work, 0);

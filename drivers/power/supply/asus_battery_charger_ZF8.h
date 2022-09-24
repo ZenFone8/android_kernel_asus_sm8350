@@ -197,8 +197,8 @@ enum JETA_CURR {
 //[+++] Add debug log
 #define CHARGER_TAG "[BAT][CHG]"
 #define ERROR_TAG "[ERR]"
-#define CHG_DBG(...)  printk(KERN_INFO CHARGER_TAG __VA_ARGS__)
-#define CHG_DBG_E(...)  printk(KERN_ERR CHARGER_TAG ERROR_TAG __VA_ARGS__)
+#define CHG_DBG(...)  pr_debug(CHARGER_TAG __VA_ARGS__)
+#define CHG_DBG_E(...)  pr_debug(CHARGER_TAG ERROR_TAG __VA_ARGS__)
 //[---] Add debug log
 
 //[+++] Add the global variables

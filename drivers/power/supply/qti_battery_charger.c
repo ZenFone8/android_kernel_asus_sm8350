@@ -1013,7 +1013,7 @@ static int usb_psy_set_prop(struct power_supply *psy,
 	switch (prop) {
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
 #ifdef CONFIG_MACH_ASUS
-		printk(KERN_ERR "[BAT][CHG] INPUT_CURRENT_LIMIT. val : %d uA\n", pval->intval);//ASUS_BSP
+		pr_debug("[BAT][CHG] INPUT_CURRENT_LIMIT. val : %d uA\n", pval->intval);//ASUS_BSP
 #endif
 		rc = usb_psy_set_icl(bcdev, prop_id, pval->intval);
 		break;
@@ -1203,7 +1203,7 @@ static int battery_psy_set_prop(struct power_supply *psy,
 	switch (prop) {
 	case POWER_SUPPLY_PROP_CHARGE_CONTROL_LIMIT:
         #ifdef ASUS_ZS673KS_PROJECT
-            printk(KERN_ERR "[HLOS][CHG]Avoid kernel to set FCC temporary\n");
+            pr_debug("[HLOS][CHG]Avoid kernel to set FCC temporary\n");
             return 0;
         #endif
 		return battery_psy_set_charge_current(bcdev, pval->intval);
