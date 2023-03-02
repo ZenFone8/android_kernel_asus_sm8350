@@ -189,3 +189,7 @@
 		};
 	};
 };
+
+&socd_trip {
+	temperature = <95>;
+};
