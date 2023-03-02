@@ -262,3 +262,10 @@
 	qcom,bt-vdd-rfa1-config = <1880000 1880000 0 1>;
 	qcom,bt-vdd-rfa2-config = <1350000 1350000 0 1>;
 };
+
+&qupv3_se13_i2c {
+	nq@64 {
+		/delete-property/ vdd-supply;
+		/delete-property/ rtc6226,vdd-supply-voltage;
+	};
+};
