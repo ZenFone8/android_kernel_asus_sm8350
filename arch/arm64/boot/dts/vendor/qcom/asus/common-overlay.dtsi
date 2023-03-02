@@ -1,3 +1,9 @@
 /*
  * Common qcom dtsi overlay changes for Sake and Vodka platform
  */
+
+&display_panel_avdd {
+	/delete-property/ gpio;
+	/delete-property/ pinctrl-names;
+	/delete-property/ pinctrl-0;
+};
