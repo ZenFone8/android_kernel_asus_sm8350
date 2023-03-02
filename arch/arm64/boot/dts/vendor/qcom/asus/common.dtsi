@@ -191,3 +191,10 @@
 	qcom,init-voltage = <976000>;
 	qcom,init-mode = <RPMH_REGULATOR_MODE_HPM>;
 };
+
+&reserved_memory {
+	asus_debug_mem: asus_debug_resion@9b800000 {
+		no-map;
+		reg = <0x0 0x9b800000 0x0 0x00400000>;
+	};
+};
