@@ -35,6 +35,7 @@
 #define JETA_NONE			0
 #define JETA_CV				4
 
+#define OEM_OPCODE_READ_BUFFER			0x10000
 #define OEM_OPCODE_WRITE_BUFFER		0x10001
 
 #define OEM_PROPERTY_MAX_DATA_SIZE	16
@@ -75,6 +76,19 @@
 
 #define dwork_to_abc(work, member) \
 	container_of(to_delayed_work(work), struct asus_battery_chg, member)
+
+struct oem_read_buffer_req_msg {
+	struct pmic_glink_hdr hdr;
+	u32 oem_property_id;
+	u32 data_size;
+};
+
+struct oem_read_buffer_resp_msg {
+	struct pmic_glink_hdr hdr;
+	u32 oem_property_id;
+	u32 data_buffer[OEM_PROPERTY_MAX_DATA_SIZE];
+	u32 data_size;
+};
 
 struct oem_write_buffer_req_msg {
 	struct pmic_glink_hdr hdr;
@@ -151,6 +165,19 @@ static int handle_usb_online(struct notifier_block *nb, unsigned long status,
 	}
 
 	return 0;
+}
+
+static int read_property_id_oem(struct asus_battery_chg *abc, u32 prop_id, size_t count)
+{
+	struct oem_read_buffer_req_msg req_msg = { { 0 } };
+
+	req_msg.hdr.owner = MSG_OWNER_OEM;
+	req_msg.hdr.type = MSG_TYPE_REQ_RESP;
+	req_msg.hdr.opcode = OEM_OPCODE_READ_BUFFER;
+	req_msg.oem_property_id = prop_id;
+	req_msg.data_size = count;
+
+	return battery_chg_write(abc->bcdev, &req_msg, sizeof(req_msg));
 }
 
 static int write_property_id_oem(struct asus_battery_chg *abc, u32 prop_id,
@@ -729,17 +756,31 @@ static void handle_message(struct asus_battery_chg *abc, void *data,
 			   size_t len)
 {
 	struct device *dev = battery_chg_device(abc->bcdev);
-	struct oem_write_buffer_resp_msg *resp_msg;
+	struct oem_read_buffer_resp_msg *read_resp_msg;
+	struct oem_write_buffer_resp_msg *write_resp_msg;
 	struct pmic_glink_hdr *hdr = data;
 	bool ack_set = false;
 
 	switch (hdr->opcode) {
+	case OEM_OPCODE_READ_BUFFER:
+		CHECK_SET_DATA(read_resp_msg);
+
+		read_resp_msg = data;
+
+		switch (read_resp_msg->oem_property_id) {
+		default:
+			ack_set = true;
+			dev_err(dev, "Unknown property_id: %u\n",
+					read_resp_msg->oem_property_id);
+			break;
+		}
+
 	case OEM_OPCODE_WRITE_BUFFER:
-		CHECK_SET_DATA(resp_msg);
+		CHECK_SET_DATA(write_resp_msg);
 
-		resp_msg = data;
+		write_resp_msg = data;
 
-		switch (resp_msg->oem_property_id) {
+		switch (write_resp_msg->oem_property_id) {
 		case OEM_THERMAL_ALERT_SET:
 		case OEM_THERMAL_THRESHOLD:
 		case OEM_WORK_EVENT:
@@ -750,7 +791,7 @@ static void handle_message(struct asus_battery_chg *abc, void *data,
 		default:
 			ack_set = true;
 			dev_err(dev, "Unknown property_id: %u\n",
-			       resp_msg->oem_property_id);
+			       write_resp_msg->oem_property_id);
 			break;
 		}
 		break;
