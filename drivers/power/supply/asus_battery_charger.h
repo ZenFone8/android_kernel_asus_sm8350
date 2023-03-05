@@ -57,6 +57,10 @@ struct asus_battery_chg {
 	struct delayed_work		battery_safety_work;
 };
 
+struct chgPD_info {
+	bool	charging_suspend;
+};
+
 int asus_battery_charger_init(struct asus_battery_chg *abc);
 int asus_battery_charger_deinit(struct asus_battery_chg *abc);
 
