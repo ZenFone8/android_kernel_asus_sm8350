@@ -292,40 +292,6 @@ static void full_cap_monitor_worker(struct work_struct *work)
 
 extern bool g_Charger_mode;
 
-static ssize_t charger_limit_en_store(struct class *c,
-			struct class_attribute *attr,
-			const char *buf, size_t count)
-{
-	int rc;
-	u32 tmp;
-
-	tmp = simple_strtol(buf, NULL, 10);
-
-	CHG_DBG("%s. enable : %d", __func__, tmp);
-	rc = oem_prop_write(BATTMAN_OEM_CHG_LIMIT_EN, &tmp, 1);
-	if (rc < 0) {
-		pr_err("Failed to set CHG_LIMIT_EN rc=%d\n", rc);
-		return rc;
-	}
-
-	return count;
-}
-
-static ssize_t charger_limit_en_show(struct class *c,
-			struct class_attribute *attr, char *buf)
-{
-	int rc;
-
-	rc = oem_prop_read(BATTMAN_OEM_CHG_LIMIT_EN, 1);
-	if (rc < 0) {
-		pr_err("Failed to get CHG_LIMIT_EN rc=%d\n", rc);
-		return rc;
-	}
-
-	return scnprintf(buf, PAGE_SIZE, "%d\n", ChgPD_Info.chg_limit_en);
-}
-static CLASS_ATTR_RW(charger_limit_en);
-
 static void charger_mode_worker(struct work_struct *work)
 {
 	struct asus_battery_chg *abc = dwork_to_abc(work, charger_mode_work);
@@ -833,7 +799,6 @@ static ssize_t set_virtualthermal_store(struct class *c,
 static CLASS_ATTR_WO(set_virtualthermal);
 
 static struct attribute *asuslib_class_attrs[] = {
-	&class_attr_charger_limit_en.attr,
 	&class_attr_set_virtualthermal.attr,
 	NULL,
 };
