@@ -46,19 +46,6 @@
 #define GESTURE_V 0x54
 
 #if defined ASUS_SAKE_PROJECT
-#define KEY_LAST_USED BTN_TRIGGER_HAPPY40
-#define KEY_GESTURE_UP (KEY_LAST_USED + 1)
-#define KEY_GESTURE_E (KEY_LAST_USED + 2)
-#define KEY_GESTURE_M (KEY_LAST_USED + 3)
-#define KEY_GESTURE_W (KEY_LAST_USED + 4)
-#define KEY_GESTURE_S (KEY_LAST_USED + 5)
-#define KEY_GESTURE_V (KEY_LAST_USED + 6)
-#define KEY_GESTURE_Z (KEY_LAST_USED + 7)
-
-#define KEY_GESTURE_PAUSE (KEY_LAST_USED + 8)
-#define KEY_GESTURE_REWIND (KEY_LAST_USED + 9)
-#define KEY_GESTURE_FORWARD (KEY_LAST_USED + 10)
-
 #define GESTURE_MUSIC_PAUSE 0x26
 #define GESTURE_MUSIC_REWIND 0x51
 #define GESTURE_MUSIC_FORWARD 0x52
@@ -67,6 +54,25 @@
 #define GESTURE_FOD_PRESS 0x28
 #define GESTURE_FOD_PARTIAL_PRESS 0x2A
 #define GESTURE_FOD_UNPRESS 0x29
+
+//FOD action
+#define KEY_GESTURE_O                           KEY_O
+#define KEY_GESTURE_F                           KEY_F
+#define KEY_GESTURE_U                           KEY_U
+#define KEY_GESTURE_L                           KEY_L
+//media
+#define KEY_GESTURE_PAUSE                       KEY_PAUSE
+#define KEY_GESTURE_REWIND                      KEY_REWIND
+#define KEY_GESTURE_FORWARD                     KEY_FORWARD
+//Zenmotion
+#define KEY_GESTURE_UP                          KEY_UP
+#define KEY_GESTURE_E                           KEY_E
+#define KEY_GESTURE_M                           KEY_M
+#define KEY_GESTURE_W                           KEY_W
+#define KEY_GESTURE_S                           KEY_S
+#define KEY_GESTURE_V                           KEY_V
+#define KEY_GESTURE_Z                           KEY_Z
+
 #else
 #define KEY_GESTURE_UP KEY_UP
 #define KEY_GESTURE_E KEY_E
@@ -696,30 +702,42 @@ int fts_gesture_init(struct fts_ts_data *ts_data)
 	struct input_dev *input_dev = ts_data->input_dev;
 
 	FTS_FUNC_ENTER();
+
+//FOD
+	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_O);
+	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_F);
+	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_U);
+	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_L);
+
+//media    
+	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_PAUSE);
+	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_REWIND);
+	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_FORWARD);
+
+//Zenmotion
 	input_set_capability(input_dev, EV_KEY, KEY_POWER);
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_UP);
-#if !defined ASUS_SAKE_PROJECT
-	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_DOWN);
-	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_LEFT);
-	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_RIGHT);
-	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_O);
-#endif
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_E);
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_M);
-#if !defined ASUS_SAKE_PROJECT
-	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_L);
-#endif
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_W);
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_S);
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_V);
 	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_Z);
-#if !defined ASUS_SAKE_PROJECT
-	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_C);
-#endif
-	input_set_capability(input_dev, EV_KEY, KEY_WAKEUP);
-	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_PAUSE);
-	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_REWIND);
-	input_set_capability(input_dev, EV_KEY, KEY_GESTURE_FORWARD);
+	
+//FOD 
+	__set_bit(KEY_GESTURE_O, input_dev->keybit);
+	__set_bit(KEY_GESTURE_F, input_dev->keybit);
+	__set_bit(KEY_GESTURE_U, input_dev->keybit);
+	__set_bit(KEY_GESTURE_L, input_dev->keybit);
+
+//Zenmotion
+	__set_bit(KEY_GESTURE_UP, input_dev->keybit);
+	__set_bit(KEY_GESTURE_E, input_dev->keybit);
+	__set_bit(KEY_GESTURE_M, input_dev->keybit);
+	__set_bit(KEY_GESTURE_W, input_dev->keybit);
+	__set_bit(KEY_GESTURE_S, input_dev->keybit);
+	__set_bit(KEY_GESTURE_V, input_dev->keybit);
+	__set_bit(KEY_GESTURE_Z, input_dev->keybit);
 
 #if defined ASUS_SAKE_PROJECT
 	INIT_DELAYED_WORK(&ts_data->gesture_work, fts_gesture_work);
