@@ -220,6 +220,8 @@ static void panel_check_worker(struct work_struct *work)
 {
 	struct asus_battery_chg *abc = dwork_to_abc(work, panel_check_work);
 
+	pr_err("panel check work\n");
+
 	write_property_work_event(abc, WORK_PANEL_CHECK);
 
 	schedule_delayed_work(&abc->panel_check_work, 10 * HZ);
@@ -302,6 +304,7 @@ static void panel_state_worker(struct work_struct *work)
 	u32 tmp = abc->panel_on;
 	int rc;
 
+	pr_err("Write OEM_PANEL_CHECK\n");
 	rc = write_property_id_oem(abc, OEM_PANEL_CHECK, &tmp, 1);
 	if (rc)
 		dev_err(dev, "Failed to write panel check %u, rc=%d\n",
@@ -657,11 +660,13 @@ static int drm_notifier_callback(struct notifier_block *self,
 
 	blank = evdata->data;
 
-	if (*blank == DRM_PANEL_BLANK_UNBLANK)
+	if (*blank == DRM_PANEL_BLANK_UNBLANK) {
+		pr_err("panel: ON\n");
 		abc->panel_on = true;
-	else if (*blank == DRM_PANEL_BLANK_POWERDOWN)
+	} else if (*blank == DRM_PANEL_BLANK_POWERDOWN) {
+		pr_err("panel: OFF\n");
 		abc->panel_on = false;
-	else
+	} else
 		return 0;
 
 	schedule_delayed_work(&abc->panel_state_work, 0);
