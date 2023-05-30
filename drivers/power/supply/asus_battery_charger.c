@@ -133,6 +133,9 @@ static int handle_usb_online(struct notifier_block *nb, unsigned long status,
 		cancel_delayed_work_sync(&abc->thermal_policy_work);
 		schedule_delayed_work(&abc->thermal_policy_work, 68 * HZ);
 
+		if (abc->slow_charging_enabled)
+			schedule_delayed_work(&abc->slow_charge_work, 0);
+
 		__pm_wakeup_event(abc->slowchg_ws, 60 * 1000);
 	} else {
 		cancel_delayed_work_sync(&abc->jeita_rule_work);
@@ -296,6 +299,23 @@ static void panel_state_worker(struct work_struct *work)
 	rc = write_property_work_event(abc, WORK_PANEL_CHECK);
 	if (rc)
 		dev_err(dev, "Failed to write panel work check, rc=%d\n", rc);
+}
+
+static void slow_charge_worker(struct work_struct *work)
+{
+	struct asus_battery_chg *abc = dwork_to_abc(work, slow_charge_work);
+	int rc;
+	u32 tmp = abc->slow_charging_enabled;
+
+	pr_err("Write OEM_PANEL_CHECK for charging disable\n");
+	rc = write_property_id_oem(abc, OEM_PANEL_CHECK, &tmp, 1);
+	if (rc)
+		pr_err("Failed to write slow charge %u, rc=%d\n",
+			tmp, rc);
+
+	rc = write_property_work_event(abc, WORK_PANEL_CHECK);
+	if (rc)
+		pr_err("Failed to apply slow charge, rc=%d\n", rc);
 }
 
 static int file_op(const char *filename, loff_t offset, char *buf, int length,
@@ -554,6 +574,27 @@ static ssize_t charging_suspend_show(struct class *c,
 }
 static CLASS_ATTR_RW(charging_suspend);
 
+static ssize_t slow_charging_enable_store(struct class *c,
+			struct class_attribute *attr,
+			const char *buf, size_t count)
+{
+	struct asus_battery_chg *abc = container_of(c, struct asus_battery_chg, asuslib_class);
+	abc->slow_charging_enabled = simple_strtol(buf, NULL, 10);
+
+	schedule_delayed_work(&abc->slow_charge_work, 0);
+
+	return count;
+}
+
+static ssize_t slow_charging_enable_show(struct class *c,
+			struct class_attribute *attr, char *buf)
+{
+	struct asus_battery_chg *abc = container_of(c, struct asus_battery_chg, asuslib_class);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", abc->slow_charging_enabled);
+}
+static CLASS_ATTR_RW(slow_charging_enable);
+
 static void update_safety_data(struct asus_battery_chg *abc)
 {
 	struct device *dev = battery_chg_device(abc->bcdev);
@@ -656,7 +697,7 @@ static int drm_notifier_callback(struct notifier_block *self,
 	} else
 		return 0;
 
-	if (abc->usb_online)
+	if (abc->usb_online && !abc->slow_charging_enabled)
 		schedule_delayed_work(&abc->panel_state_work, 0);
 
 	return 0;
@@ -813,6 +854,7 @@ static CLASS_ATTR_WO(set_virtualthermal);
 
 static struct attribute *asuslib_class_attrs[] = {
 	&class_attr_charging_suspend.attr,
+	&class_attr_slow_charging_enable.attr,
 	&class_attr_set_virtualthermal.attr,
 	NULL,
 };
@@ -938,6 +980,7 @@ int asus_battery_charger_init(struct asus_battery_chg *abc)
 	abc->drm_notif.notifier_call = drm_notifier_callback;
 	drm_panel_notifier_register(abc->panel, &abc->drm_notif);
 	INIT_DELAYED_WORK(&abc->panel_state_work, panel_state_worker);
+	INIT_DELAYED_WORK(&abc->slow_charge_work, slow_charge_worker);
 
 	INIT_DELAYED_WORK(&abc->usb_thermal_work, usb_thermal_worker);
 	schedule_delayed_work(&abc->usb_thermal_work, 0);
